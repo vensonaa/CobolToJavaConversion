@@ -28,6 +28,10 @@ class ConversionState(TypedDict):
     current_step: str
     iteration_count: int
     max_iterations: int
+    chunks: List[str]
+    current_chunk: int
+    total_chunks: int
+    chunk_results: List[Dict[str, Any]]
 
 # Initialize the LLM
 llm = ChatGroq(
@@ -35,6 +39,43 @@ llm = ChatGroq(
     temperature=0.1,
     api_key=os.getenv("GROQ_API_KEY")
 )
+
+def chunk_cobol_code(cobol_code: str, max_chunk_size: int = 8000) -> List[str]:
+    """
+    Split large COBOL code into manageable chunks.
+    
+    Args:
+        cobol_code: The COBOL code to chunk
+        max_chunk_size: Maximum size of each chunk in characters
+    
+    Returns:
+        List of COBOL code chunks
+    """
+    if len(cobol_code) <= max_chunk_size:
+        return [cobol_code]
+    
+    chunks = []
+    lines = cobol_code.split('\n')
+    current_chunk = []
+    current_size = 0
+    
+    for line in lines:
+        line_size = len(line) + 1  # +1 for newline
+        
+        if current_size + line_size > max_chunk_size and current_chunk:
+            # Save current chunk and start new one
+            chunks.append('\n'.join(current_chunk))
+            current_chunk = [line]
+            current_size = line_size
+        else:
+            current_chunk.append(line)
+            current_size += line_size
+    
+    # Add the last chunk
+    if current_chunk:
+        chunks.append('\n'.join(current_chunk))
+    
+    return chunks
 
 # Agent definitions
 class PlannerAgent:
@@ -45,12 +86,16 @@ class PlannerAgent:
     
     def plan_conversion(self, state: ConversionState) -> ConversionState:
         """Create a conversion plan based on COBOL code and prior knowledge."""
+        
+        # If we have chunks, work with the first chunk for planning
+        cobol_code = state['chunks'][0] if state['chunks'] else state['cobol_code']
+        
         prompt = f"""
         You are a COBOL to Java conversion planner. Based on the provided COBOL code and prior knowledge, 
         create a detailed conversion plan.
         
-        COBOL Code:
-        {state['cobol_code']}
+        COBOL Code (Chunk 1 of {state['total_chunks']}):
+        {cobol_code[:4000]}...
         
         Prior Knowledge:
         {state['prior_knowledge']}
@@ -60,6 +105,7 @@ class PlannerAgent:
         2. Key conversion challenges
         3. Required Java patterns and libraries
         4. Step-by-step conversion approach
+        5. How to handle multiple chunks if present
         
         Return your plan as a structured response.
         """
@@ -80,13 +126,17 @@ class ExecutorAgent:
     
     def execute_conversion(self, state: ConversionState) -> ConversionState:
         """Execute the conversion plan by delegating to specialized agents."""
+        
+        cobol_preview = state['chunks'][0][:200] if state['chunks'] else state['cobol_code'][:200]
+        
         prompt = f"""
         You are the executor agent for COBOL to Java conversion. 
         The planning phase is complete. Now you need to coordinate the conversion process.
         
         Current State:
-        - COBOL Code: {state['cobol_code'][:200]}...
-        - Plan: {state['summary']}
+        - COBOL Code: {cobol_preview}...
+        - Total Chunks: {state['total_chunks']}
+        - Plan: {state['summary'][:500]}...
         
         Proceed with the conversion workflow:
         1. Delegate to Pseudo Code Generator
@@ -114,12 +164,16 @@ class PseudoCodeGeneratorAgent:
     
     def generate_pseudo_code(self, state: ConversionState) -> ConversionState:
         """Generate pseudo code from COBOL code."""
+        
+        # Work with current chunk
+        current_chunk = state['chunks'][state['current_chunk']] if state['chunks'] else state['cobol_code']
+        
         prompt = f"""
         You are an expert COBOL analyst. Analyze the following COBOL code and generate 
         clear, detailed pseudo code that explains the logic and structure.
         
-        COBOL Code:
-        {state['cobol_code']}
+        COBOL Code (Chunk {state['current_chunk'] + 1} of {state['total_chunks']}):
+        {current_chunk}
         
         Generate pseudo code that:
         1. Explains the main program logic
@@ -134,7 +188,7 @@ class PseudoCodeGeneratorAgent:
         
         state['pseudo_code'] = response.content
         state['current_step'] = 'pseudo_code_generated'
-        state['summary'] += f"\n\nPseudo Code Generated:\n{response.content[:200]}..."
+        state['summary'] += f"\n\nPseudo Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -146,11 +200,15 @@ class JavaCodeGeneratorAgent:
     
     def generate_java_code(self, state: ConversionState) -> ConversionState:
         """Generate Java code from COBOL code and pseudo code."""
+        
+        # Work with current chunk
+        current_chunk = state['chunks'][state['current_chunk']] if state['chunks'] else state['cobol_code']
+        
         prompt = f"""
         You are an expert Java developer specializing in COBOL to Java conversion.
         
-        COBOL Code:
-        {state['cobol_code']}
+        COBOL Code (Chunk {state['current_chunk'] + 1} of {state['total_chunks']}):
+        {current_chunk}
         
         Pseudo Code:
         {state['pseudo_code']}
@@ -162,6 +220,7 @@ class JavaCodeGeneratorAgent:
         4. Includes proper error handling
         5. Uses meaningful variable and method names
         6. Includes comments explaining complex logic
+        7. If this is part of a larger system, create appropriate classes and methods
         
         Return only the Java code with appropriate imports and class structure.
         """
@@ -170,7 +229,7 @@ class JavaCodeGeneratorAgent:
         
         state['java_code'] = response.content
         state['current_step'] = 'java_code_generated'
-        state['summary'] += f"\n\nJava Code Generated:\n{response.content[:200]}..."
+        state['summary'] += f"\n\nJava Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -184,12 +243,15 @@ class CodeReviewerAgent:
         """Review the generated Java code and provide feedback."""
         java_code = state.get('fixed_java_code', state['java_code'])
         
+        # Work with current chunk for context
+        current_chunk = state['chunks'][state['current_chunk']] if state['chunks'] else state['cobol_code']
+        
         prompt = f"""
         You are a senior Java code reviewer. Review the following Java code that was 
         converted from COBOL and provide detailed feedback.
         
-        Original COBOL Code:
-        {state['cobol_code']}
+        Original COBOL Code (Chunk {state['current_chunk'] + 1} of {state['total_chunks']}):
+        {current_chunk[:1000]}...
         
         Generated Java Code:
         {java_code}
@@ -215,7 +277,7 @@ class CodeReviewerAgent:
             state['review_comments'] = [response.content]
             state['current_step'] = 'review_failed'
         
-        state['summary'] += f"\n\nCode Review:\n{response.content[:200]}..."
+        state['summary'] += f"\n\nCode Review (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -229,11 +291,14 @@ class CodeFixerAgent:
         """Fix the Java code based on review comments."""
         java_code = state.get('fixed_java_code', state['java_code'])
         
+        # Work with current chunk for context
+        current_chunk = state['chunks'][state['current_chunk']] if state['chunks'] else state['cobol_code']
+        
         prompt = f"""
         You are a Java code fixer. Fix the following Java code based on the review comments.
         
-        Original COBOL Code:
-        {state['cobol_code']}
+        Original COBOL Code (Chunk {state['current_chunk'] + 1} of {state['total_chunks']}):
+        {current_chunk[:1000]}...
         
         Current Java Code:
         {java_code}
@@ -255,7 +320,7 @@ class CodeFixerAgent:
         state['fixed_java_code'] = response.content
         state['current_step'] = 'code_fixed'
         state['iteration_count'] += 1
-        state['summary'] += f"\n\nCode Fixed (Iteration {state['iteration_count']}):\n{response.content[:200]}..."
+        state['summary'] += f"\n\nCode Fixed (Chunk {state['current_chunk'] + 1}, Iteration {state['iteration_count']}):\n{response.content[:200]}..."
         
         return state
 
@@ -267,13 +332,22 @@ class FinalSummarizerAgent:
     
     def summarize_conversion(self, state: ConversionState) -> ConversionState:
         """Provide a comprehensive summary of the conversion process."""
+        
+        # Combine all chunk results
+        all_java_code = ""
+        if state['chunk_results']:
+            all_java_code = "\n\n".join([result.get('java_code', '') for result in state['chunk_results']])
+        else:
+            all_java_code = state.get('fixed_java_code', state['java_code'])
+        
         prompt = f"""
         You are a conversion process summarizer. Provide a comprehensive summary of the 
         COBOL to Java conversion that was just completed.
         
         Conversion Details:
         - Original COBOL Code Length: {len(state['cobol_code'])} characters
-        - Final Java Code Length: {len(state.get('fixed_java_code', state['java_code']))} characters
+        - Total Chunks Processed: {state['total_chunks']}
+        - Final Java Code Length: {len(all_java_code)} characters
         - Number of Review Iterations: {state['iteration_count']}
         - Review Comments: {state['review_comments']}
         
@@ -283,6 +357,7 @@ class FinalSummarizerAgent:
         3. Quality of the final Java code
         4. Recommendations for further improvements
         5. Lessons learned for future conversions
+        6. How the chunking strategy worked
         """
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
@@ -377,6 +452,10 @@ async def convert_cobol_to_java(cobol_code: str, prior_knowledge: str = "") -> D
         Dictionary containing the conversion results
     """
     
+    # Chunk the COBOL code if it's too large
+    chunks = chunk_cobol_code(cobol_code, max_chunk_size=6000)
+    print(f"📦 Split COBOL code into {len(chunks)} chunks")
+    
     # Initialize state
     initial_state = ConversionState(
         cobol_code=cobol_code,
@@ -388,7 +467,11 @@ async def convert_cobol_to_java(cobol_code: str, prior_knowledge: str = "") -> D
         summary="",
         current_step="started",
         iteration_count=0,
-        max_iterations=5
+        max_iterations=5,
+        chunks=chunks,
+        current_chunk=0,
+        total_chunks=len(chunks),
+        chunk_results=[]
     )
     
     # Create and run the graph
@@ -396,19 +479,50 @@ async def convert_cobol_to_java(cobol_code: str, prior_knowledge: str = "") -> D
     
     print("🚀 Starting COBOL to Java conversion...")
     print(f"📝 COBOL Code Length: {len(cobol_code)} characters")
+    print(f"📦 Processing {len(chunks)} chunks...")
     
-    result = await graph.ainvoke(initial_state)
+    # Process each chunk
+    all_java_code = []
+    all_pseudo_code = []
     
-    print("✅ Conversion completed!")
+    for i, chunk in enumerate(chunks):
+        print(f"🔄 Processing chunk {i+1} of {len(chunks)}...")
+        
+        # Update state for current chunk
+        initial_state['current_chunk'] = i
+        initial_state['chunks'] = chunks
+        
+        # Run conversion for this chunk
+        result = await graph.ainvoke(initial_state)
+        
+        # Store chunk results
+        chunk_result = {
+            'chunk_number': i + 1,
+            'java_code': result.get('fixed_java_code', result['java_code']),
+            'pseudo_code': result['pseudo_code'],
+            'review_comments': result['review_comments']
+        }
+        initial_state['chunk_results'].append(chunk_result)
+        
+        all_java_code.append(chunk_result['java_code'])
+        all_pseudo_code.append(chunk_result['pseudo_code'])
+    
+    print("✅ All chunks processed!")
+    
+    # Combine results
+    final_java_code = "\n\n// ===== CHUNK SEPARATOR =====\n\n".join(all_java_code)
+    final_pseudo_code = "\n\n=== CHUNK SEPARATOR ===\n\n".join(all_pseudo_code)
     
     return {
-        "original_cobol": result["cobol_code"],
-        "pseudo_code": result["pseudo_code"],
-        "final_java_code": result.get("fixed_java_code", result["java_code"]),
+        "original_cobol": cobol_code,
+        "pseudo_code": final_pseudo_code,
+        "final_java_code": final_java_code,
         "review_comments": result["review_comments"],
         "summary": result["summary"],
         "iterations": result["iteration_count"],
-        "status": result["current_step"]
+        "status": result["current_step"],
+        "total_chunks": len(chunks),
+        "chunk_results": initial_state['chunk_results']
     }
 
 # Example usage
@@ -416,23 +530,46 @@ if __name__ == "__main__":
     # Example COBOL code
     sample_cobol = """
        IDENTIFICATION DIVISION.
-       PROGRAM-ID. HELLO-WORLD.
+       PROGRAM-ID. SAMPLE-PROGRAM.
        
        ENVIRONMENT DIVISION.
        
        DATA DIVISION.
        WORKING-STORAGE SECTION.
-           01 WS-NAME PIC X(20) VALUE 'World'.
-           01 WS-MESSAGE PIC X(50).
+           01 WS-NAME         PIC X(20) VALUE 'John Doe'.
+           01 WS-AGE          PIC 9(3)  VALUE 25.
+           01 WS-SALARY       PIC 9(6)V99 VALUE 50000.00.
+           01 WS-MESSAGE      PIC X(50).
+           01 WS-COUNTER      PIC 9(3)  VALUE 0.
        
        PROCEDURE DIVISION.
-           MOVE 'Hello, ' TO WS-MESSAGE
-           STRING WS-MESSAGE DELIMITED BY SIZE
-                  WS-NAME DELIMITED BY SPACE
-                  '!' DELIMITED BY SIZE
-                  INTO WS-MESSAGE
-           DISPLAY WS-MESSAGE
+       MAIN-LOGIC.
+           PERFORM INITIALIZE-PROGRAM
+           PERFORM PROCESS-DATA
+           PERFORM DISPLAY-RESULTS
            STOP RUN.
+       
+       INITIALIZE-PROGRAM.
+           MOVE 'Program initialized successfully' TO WS-MESSAGE
+           DISPLAY WS-MESSAGE.
+       
+       PROCESS-DATA.
+           ADD 1 TO WS-COUNTER
+           IF WS-AGE > 18
+               DISPLAY 'Adult: ' WS-NAME
+           ELSE
+               DISPLAY 'Minor: ' WS-NAME
+           END-IF
+           
+           IF WS-SALARY > 40000
+               DISPLAY 'High earner: $' WS-SALARY
+           ELSE
+               DISPLAY 'Standard salary: $' WS-SALARY
+           END-IF.
+       
+       DISPLAY-RESULTS.
+           DISPLAY 'Final counter value: ' WS-COUNTER
+           DISPLAY 'Program completed successfully'.
     """
     
     # Example prior knowledge
@@ -451,6 +588,7 @@ if __name__ == "__main__":
         print("="*50)
         print(f"Status: {result['status']}")
         print(f"Iterations: {result['iterations']}")
+        print(f"Total Chunks: {result['total_chunks']}")
         print(f"\nPseudo Code:\n{result['pseudo_code']}")
         print(f"\nFinal Java Code:\n{result['final_java_code']}")
         print(f"\nSummary:\n{result['summary']}")

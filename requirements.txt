@@ -4,6 +4,11 @@ langchain==0.2.0
 langchain-groq==0.1.0
 langchain-community==0.2.0
 
+# FastAPI and web dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
 # Core Python dependencies
 pydantic>=2.0.0
 python-dotenv>=1.0.0

@@ -1,6 +1,6 @@
 # COBOL to Java Conversion using LangGraph
 
-A sophisticated multi-agent system built with LangGraph that converts COBOL code to Java using a collaborative workflow of specialized AI agents powered by Groq.
+A sophisticated multi-agent system built with LangGraph that converts COBOL code to Java using a collaborative workflow of specialized AI agents powered by Groq, with a modern web interface.
 
 ## 🏗️ Architecture Overview
 
@@ -39,111 +39,125 @@ This project implements a **7-agent workflow** using LangGraph for intelligent C
 - **Error Handling**: Robust error handling throughout the conversion process
 - **Configurable**: Easy configuration through environment variables
 - **Fast Processing**: Powered by Groq's high-performance LLM infrastructure
+- **Web Interface**: Modern React frontend with Vite
+- **REST API**: FastAPI backend with comprehensive endpoints
+- **Separate Java Files**: Generates individual Java class files
+- **Chunking Strategy**: Handles large COBOL programs efficiently
 
 ## 📋 Prerequisites
 
 - Python 3.8+
+- Node.js 16+
 - Groq API key
 - Required Python packages (see `requirements.txt`)
 
-## 🛠️ Installation
+## 🛠️ Quick Setup
 
-1. **Clone the repository**:
-   ```bash
-   git clone <repository-url>
-   cd CobolToJavaConversion
-   ```
+### 1. Clone and Setup
 
-2. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+git clone <repository-url>
+cd CobolToJavaConversion
+chmod +x setup.sh start.sh
+./setup.sh
+```
 
-3. **Set up environment variables**:
-   Create a `.env` file in the project root:
-   ```env
-   GROQ_API_KEY=your_groq_api_key_here
-   GROQ_MODEL=llama3-70b-8192
-   GROQ_TEMPERATURE=0.1
-   MAX_REVIEW_ITERATIONS=5
-   OUTPUT_DIR=output
-   ```
+### 2. Configure Environment
+
+Edit the `.env` file and add your Groq API key:
+```env
+GROQ_API_KEY=your_groq_api_key_here
+```
+
+### 3. Start the System
+
+```bash
+./start.sh
+```
+
+This will start:
+- **FastAPI Backend**: http://localhost:8000
+- **Vite Frontend**: http://localhost:5173
+- **API Documentation**: http://localhost:8000/docs
 
 ## 🎯 Usage
 
-### Basic Usage
+### Web Interface
 
-```python
-import asyncio
-from main import convert_cobol_to_java
+1. Open http://localhost:5173 in your browser
+2. Enter COBOL code or upload a COBOL file
+3. Add optional prior knowledge
+4. Click "Convert to Java"
+5. View results and download generated files
 
-async def main():
-    cobol_code = """
-       IDENTIFICATION DIVISION.
-       PROGRAM-ID. HELLO-WORLD.
-       PROCEDURE DIVISION.
-           DISPLAY 'Hello, World!'
-           STOP RUN.
-    """
-    
-    prior_knowledge = "Simple COBOL program that displays a greeting."
-    
-    result = await convert_cobol_to_java(cobol_code, prior_knowledge)
-    
-    print(f"Java Code:\n{result['final_java_code']}")
-    print(f"Summary:\n{result['summary']}")
-
-asyncio.run(main())
-```
-
-### Running Examples
-
-1. **Simple Example**:
-   ```bash
-   python main.py
-   ```
-
-2. **Complex Example** (Payroll System):
-   ```bash
-   python examples/complex_cobol_example.py
-   ```
-
-### Command Line Interface
+### Command Line
 
 ```bash
-# Convert a COBOL file
-python cli.py --input sample.cbl --output HelloWorld.java
+# Simple conversion
+python main.py
 
-# Convert with prior knowledge
-python cli.py --input payroll.cbl --knowledge "Banking application with file I/O"
+# Banking system conversion
+python run_banking_conversion.py
 
-# Convert and save all results
-python cli.py --input complex.cbl --save-all --output-dir results/
+# CLI interface
+python cli.py --input samples/banking_system.cbl --save-all
+```
 
-# Interactive mode
-python cli.py --interactive
+### API Endpoints
+
+```bash
+# Convert COBOL code
+curl -X POST "http://localhost:8000/api/convert" \
+  -H "Content-Type: application/json" \
+  -d '{"cobol_code": "IDENTIFICATION DIVISION...", "prior_knowledge": "..."}'
+
+# Upload COBOL file
+curl -X POST "http://localhost:8000/api/upload" \
+  -F "file=@sample.cbl"
+
+# Check conversion status
+curl "http://localhost:8000/api/status/{conversion_id}"
+
+# Download results
+curl "http://localhost:8000/api/download/{conversion_id}" -o results.zip
 ```
 
 ## 📁 Project Structure
 
 ```
 CobolToJavaConversion/
-├── main.py                          # Main application entry point
+├── main.py                          # Main LangGraph application
 ├── config.py                        # Configuration settings
 ├── cli.py                          # Command-line interface
 ├── requirements.txt                 # Python dependencies
+├── setup.sh                        # Setup script
+├── start.sh                        # Start script
 ├── README.md                       # This file
 ├── env_template.txt                # Environment variables template
-├── test_simple_conversion.py       # Basic tests
-├── examples/                       # Example scripts
-│   └── complex_cobol_example.py    # Complex COBOL conversion example
+├── run_banking_conversion.py       # Banking system conversion
+├── api/                            # FastAPI backend
+│   └── main.py                     # API server
+├── frontend/                       # Vite React frontend
+│   ├── package.json               # Node.js dependencies
+│   ├── vite.config.ts             # Vite configuration
+│   └── src/                       # React source code
+│       ├── App.tsx                # Main app component
+│       ├── api/                   # API client
+│       └── components/            # React components
 ├── utils/                          # Utility functions
-│   └── file_utils.py               # File operations and result management
-└── output/                         # Generated output files (auto-created)
-    ├── *.java                      # Generated Java files
-    ├── *_pseudo.txt               # Pseudo code analysis
-    ├── *_summary.txt              # Conversion summaries
-    └── *_complete.json            # Complete conversion results
+│   ├── file_utils.py              # File operations
+│   └── java_file_generator.py     # Java file generation
+├── examples/                       # Example scripts
+│   └── complex_cobol_example.py   # Complex COBOL conversion
+├── samples/                        # Sample COBOL files
+│   ├── sample.cbl                 # Simple COBOL example
+│   └── banking_system.cbl         # Large banking system
+└── output/                         # Generated output files
+    ├── java/                      # Generated Java files
+    ├── *.java                     # Individual Java classes
+    ├── *_pseudo.txt              # Pseudo code analysis
+    ├── *_summary.txt             # Conversion summaries
+    └── *_complete.json           # Complete conversion results
 ```
 
 ## 🔧 Configuration
@@ -197,6 +211,8 @@ PROCEDURE DIVISION.
 
 ### Generated Java
 ```java
+package com.banking.system;
+
 public class HelloWorld {
     public static void main(String[] args) {
         System.out.println("Hello, World!");
@@ -232,6 +248,12 @@ The system can handle complex COBOL file operations:
 - Best practices enforcement
 - Error handling validation
 
+### Chunking Strategy
+- Automatic splitting of large COBOL programs
+- Per-chunk processing through the workflow
+- Result combination and aggregation
+- Handles context length limitations
+
 ## 🚨 Error Handling
 
 The system includes comprehensive error handling:
@@ -248,6 +270,7 @@ The system includes comprehensive error handling:
 - **Iteration Limits**: Prevents infinite review-fix loops
 - **Memory Management**: Efficient state management throughout the workflow
 - **Fast LLM**: Powered by Groq's high-performance infrastructure
+- **Chunking**: Efficient handling of large programs
 
 ## 🤝 Contributing
 
@@ -276,6 +299,8 @@ For issues and questions:
 - [ ] Custom conversion templates
 - [ ] Performance optimization
 - [ ] Additional output formats
+- [ ] Real-time collaboration features
+- [ ] Advanced code analysis tools
 
 ---
 
