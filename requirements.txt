@@ -1,0 +1,20 @@
+# Core LangGraph and LangChain dependencies
+langgraph==0.2.0
+langchain==0.2.0
+langchain-groq==0.1.0
+langchain-community==0.2.0
+
+# Core Python dependencies
+pydantic>=2.0.0
+python-dotenv>=1.0.0
+typing-extensions>=4.0.0
+
+# Additional utilities
+pathlib2>=2.3.0
+
+# Development and testing (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.21.0
+black>=23.0.0
+flake8>=6.0.0
+mypy>=1.0.0

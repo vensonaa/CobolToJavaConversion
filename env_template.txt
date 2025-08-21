@@ -1,0 +1,25 @@
+# Groq Configuration
+# Get your API key from: https://console.groq.com/
+GROQ_API_KEY=
+
+# Groq Model Configuration
+GROQ_MODEL=llama3-70b-8192
+GROQ_TEMPERATURE=0.1
+GROQ_MAX_TOKENS=4000
+
+# Workflow Configuration
+MAX_REVIEW_ITERATIONS=5
+ENABLE_DEBUG_LOGGING=false
+
+# Output Configuration
+OUTPUT_DIR=output
+SAVE_INTERMEDIATE_RESULTS=true
+
+# Optional: Custom agent configurations
+# PLANNER_TEMPERATURE=0.1
+# EXECUTOR_TEMPERATURE=0.1
+# PSEUDO_GENERATOR_TEMPERATURE=0.1
+# JAVA_GENERATOR_TEMPERATURE=0.1
+# REVIEWER_TEMPERATURE=0.1
+# FIXER_TEMPERATURE=0.1
+# SUMMARIZER_TEMPERATURE=0.1
