@@ -17,7 +17,12 @@ from pathlib import Path
 # Add parent directory to path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from main import convert_cobol_to_java
+# Import the conversion function from the main module
+import importlib.util
+spec = importlib.util.spec_from_file_location("conversion_module", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py"))
+conversion_module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(conversion_module)
+
 from utils.java_file_generator import JavaFileGenerator
 from utils.file_utils import save_conversion_results, create_conversion_report
 
@@ -124,7 +129,7 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
         conversion_results[conversion_id]["progress"] = 10
         
         # Run the conversion
-        result = await convert_cobol_to_java(
+        result = await conversion_module.convert_cobol_to_java(
             request.cobol_code, 
             request.prior_knowledge
         )

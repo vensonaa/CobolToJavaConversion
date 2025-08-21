@@ -4,7 +4,7 @@ echo "🚀 Setting up COBOL to Java Conversion System"
 echo "=============================================="
 
 # Check if Python 3.8+ is installed
-python_version=$(python3 --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
+python_version=$(python3 --version 2>&1 | sed -E 's/.*Python ([0-9]+\.[0-9]+).*/\1/' | head -1)
 required_version="3.8"
 
 if [ "$(printf '%s\n' "$required_version" "$python_version" | sort -V | head -n1)" = "$required_version" ]; then

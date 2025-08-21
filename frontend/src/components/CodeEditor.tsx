@@ -16,12 +16,12 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   placeholder
 }) => {
   return (
-    <div className="relative">
+    <div className="relative min-w-0">
       <textarea
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full h-96 px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono text-sm bg-transparent relative z-10 resize-none"
+        className="w-full h-48 sm:h-64 px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 font-mono text-xs sm:text-sm bg-transparent relative z-10 resize-none overflow-hidden"
         style={{
           color: 'transparent',
           caretColor: 'black',
@@ -33,8 +33,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
           style={tomorrow}
           customStyle={{
             margin: 0,
-            padding: '12px 16px',
-            fontSize: '14px',
+            padding: '8px 12px',
+            fontSize: '12px',
             lineHeight: '1.5',
             backgroundColor: 'transparent',
             border: 'none',
