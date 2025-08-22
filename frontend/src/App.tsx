@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Upload, Code, Download, Play, AlertCircle, CheckCircle, Clock, BarChart3 } from 'lucide-react'
+import { Upload, Code, Download, Play, AlertCircle, CheckCircle, Clock, BarChart3, FileCode, Activity, XCircle } from 'lucide-react'
 import CodeEditor from './components/CodeEditor'
 import FileUploader from './components/FileUploader'
 import ConversionStatus from './components/ConversionStatus'
@@ -14,6 +14,7 @@ interface ConversionResult {
   progress: number
   message: string
   result?: any
+  error_message?: string // Added for failed conversions
 }
 
 function App() {
@@ -22,6 +23,7 @@ function App() {
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null)
   const [isConverting, setIsConverting] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'upload' | 'dashboard'>('editor')
+  const [resultsTab, setResultsTab] = useState<'java' | 'summary' | 'pseudo'>('java')
 
   const handleConvert = async () => {
     if (!cobolCode.trim()) {
@@ -91,206 +93,216 @@ function App() {
 
     switch (conversionResult.status) {
       case 'processing':
-        return <Clock className="w-5 h-5 text-blue-500 animate-spin" />
+        return <Clock className="w-5 h-5 text-amber-500 animate-spin" />
       case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-500" />
+        return <CheckCircle className="w-5 h-5 text-emerald-500" />
       case 'failed':
-        return <AlertCircle className="w-5 h-5 text-red-500" />
+        return <AlertCircle className="w-5 h-5 text-rose-500" />
       default:
         return null
     }
   }
 
   return (
-    <div className="h-screen bg-gray-50 overflow-x-hidden flex flex-col">
+    <div className="w-full h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b flex-shrink-0">
-        <div className="w-full px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 gap-4">
-            <div className="flex items-center space-x-2 sm:space-x-3">
-              <Code className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" />
-              <div>
-                <h1 className="text-lg sm:text-2xl font-bold text-gray-900">
-                  COBOL to Java Converter
-                </h1>
-                <p className="text-xs sm:text-sm text-gray-500">
-                  Multi-Agent LangGraph Conversion System
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-2 sm:space-x-4">
-              <span className="text-xs sm:text-sm text-gray-500">v2.0.0</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 w-full flex flex-col">
-        {/* Main Navigation */}
-        <div className="px-4 sm:px-6 lg:px-8 py-4">
-          <nav className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm border text-sm">
+      <header className="flex-shrink-0 bg-white/90 backdrop-blur-sm shadow-lg border-b border-white/20 px-3 sm:px-4 py-2 sm:py-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+          <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            COBOL to Java Converter
+          </h1>
+          <nav className="flex space-x-1 sm:space-x-2">
             <button
               onClick={() => setActiveTab('editor')}
-              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+              className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
                 activeTab === 'editor'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
               }`}
             >
-              <Code className="w-4 h-4 inline mr-2" />
-              Code Editor
+              <Code className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Editor</span>
+              <span className="sm:hidden">Edit</span>
             </button>
             <button
               onClick={() => setActiveTab('upload')}
-              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+              className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
                 activeTab === 'upload'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
               }`}
             >
-              <Upload className="w-4 h-4 inline mr-2" />
-              File Upload
+              <Upload className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Upload</span>
+              <span className="sm:hidden">Up</span>
             </button>
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+              className={`px-2 sm:px-4 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-medium transition-all duration-200 ${
                 activeTab === 'dashboard'
-                  ? 'bg-blue-600 text-white shadow-md'
-                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                  ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
               }`}
             >
-              <BarChart3 className="w-4 h-4 inline mr-2" />
-              Dashboard
+              <BarChart3 className="w-3 h-3 sm:w-4 sm:h-4 inline mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Dashboard</span>
+              <span className="sm:hidden">Dash</span>
             </button>
           </nav>
         </div>
+      </header>
 
-                {/* Main Content Area */}
-        <div className="flex-1 w-full">
-          {activeTab === 'dashboard' ? (
-            <Dashboard />
-          ) : (
-            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
-                {/* Input Section */}
-                <div className="space-y-4 sm:space-y-6 w-full">
-                  {/* Input Content */}
-                  {activeTab === 'editor' ? (
-                    <div className="space-y-3 sm:space-y-4">
-                      <div className="bg-white rounded-lg shadow-sm border p-4">
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-1">
-                          <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                            COBOL Code
-                          </label>
-                          <span className="text-xs text-gray-500">
-                            {cobolCode.length.toLocaleString()} characters
-                          </span>
-                        </div>
-                        <CodeEditor
-                          value={cobolCode}
-                          onChange={setCobolCode}
-                          language="cobol"
-                          placeholder="Enter your COBOL code here..."
-                        />
-                        {cobolCode.length > 10000 && cobolCode.length <= 50000 && (
-                          <p className="text-xs text-blue-600 mt-2">
-                            Large file detected. The system will automatically chunk this for processing.
-                          </p>
-                        )}
-                        {cobolCode.length > 50000 && (
-                          <p className="text-xs text-orange-600 mt-2">
-                            Very large file detected. Processing may take several minutes.
-                          </p>
-                        )}
-                      </div>
-
-                      <div className="bg-white rounded-lg shadow-sm border p-4">
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
-                          Prior Knowledge (Optional)
-                        </label>
+      {/* Main Content */}
+      <main className="w-full flex-1 min-h-0 overflow-hidden">
+        {activeTab === 'editor' && (
+          <div className="h-full flex flex-col gap-3 sm:gap-4 p-2 sm:p-4">
+            {/* Two Column Layout */}
+            <div className="flex-1 flex flex-col lg:flex-row gap-3 sm:gap-4 min-h-0">
+              {/* Left Column - COBOL Code */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 p-3 sm:p-4 flex-1 flex flex-col min-h-0">
+                  <h2 className="text-sm sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center flex-shrink-0">
+                    <Code className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 text-indigo-600" />
+                    <span className="hidden sm:inline">Input COBOL Code</span>
+                    <span className="sm:hidden">COBOL Code</span>
+                  </h2>
+                  <div className="flex-1 min-h-0 overflow-y-auto">
+                    <div className="prose prose-sm max-w-none">
+                      <h3 className="text-lg font-bold text-gray-900 mb-3">Original COBOL Code</h3>
+                      <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
                         <textarea
-                          value={priorKnowledge}
-                          onChange={(e) => setPriorKnowledge(e.target.value)}
-                          rows={2}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm resize-none"
-                          placeholder="Additional context or requirements for the conversion..."
+                          value={cobolCode}
+                          onChange={(e) => setCobolCode(e.target.value)}
+                          placeholder="Enter your COBOL code here..."
+                          className="w-full h-full min-h-[300px] text-sm text-gray-900 font-mono bg-white border-none outline-none resize-none"
+                          style={{ fontFamily: 'monospace' }}
                         />
                       </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
+              {/* Right Column - Conversion Results with Tabs */}
+              <div className="flex-1 flex flex-col min-h-0">
+                <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 flex-1 flex flex-col min-h-0">
+                  {/* Results Header with Tabs */}
+                  <div className="flex-shrink-0 border-b border-gray-200">
+                    <div className="flex items-center justify-between p-3 sm:p-4">
+                      <h2 className="text-sm sm:text-lg font-bold text-gray-900 flex items-center">
+                        <FileCode className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 text-emerald-600" />
+                        <span className="hidden sm:inline">Conversion Results</span>
+                        <span className="sm:hidden">Results</span>
+                      </h2>
+                      {conversionResult && conversionResult.status === 'completed' && (
+                        <button
+                          onClick={handleDownload}
+                          className="flex items-center px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white text-xs sm:text-sm rounded sm:rounded-lg hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-md hover:shadow-lg"
+                        >
+                          <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5" />
+                          <span className="hidden sm:inline">Download</span>
+                          <span className="sm:hidden">DL</span>
+                        </button>
+                      )}
+                    </div>
+                    
+                    {/* Tabs */}
+                    <div className="flex border-b border-gray-200">
                       <button
-                        onClick={handleConvert}
-                        disabled={isConverting || !cobolCode.trim()}
-                        className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        onClick={() => setResultsTab('java')}
+                        className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                          resultsTab === 'java'
+                            ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
                       >
-                        {isConverting ? (
-                          <>
-                            <Clock className="w-4 h-4 mr-2 animate-spin" />
-                            Converting...
-                          </>
-                        ) : (
-                          <>
-                            <Play className="w-4 h-4 mr-2" />
-                            Convert to Java
-                          </>
-                        )}
+                        <span className="hidden sm:inline">Java Code</span>
+                        <span className="sm:hidden">Java</span>
+                      </button>
+                      <button
+                        onClick={() => setResultsTab('summary')}
+                        className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                          resultsTab === 'summary'
+                            ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">Summary</span>
+                        <span className="sm:hidden">Sum</span>
+                      </button>
+                      <button
+                        onClick={() => setResultsTab('pseudo')}
+                        className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                          resultsTab === 'pseudo'
+                            ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                            : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">Pseudo Code</span>
+                        <span className="sm:hidden">Pseudo</span>
                       </button>
                     </div>
-                  ) : (
-                    <FileUploader onFileUpload={handleFileUpload} />
-                  )}
-                </div>
+                  </div>
 
-                {/* Results Section */}
-                <div className="space-y-4 sm:space-y-6 w-full">
-                  <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-                    <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
-                      Conversion Results
-                    </h2>
-
+                  {/* Tab Content */}
+                  <div className="flex-1 min-h-0 p-3 sm:p-4">
                     {!conversionResult ? (
-                      <div className="text-center py-8 sm:py-12">
-                        <Code className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                        <p className="text-sm sm:text-base text-gray-500">
-                          Start a conversion to see results here
-                        </p>
+                      <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                        <Code className="w-10 h-10 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                        <p className="text-gray-500 font-medium text-sm sm:text-base">No conversion results yet</p>
+                        <p className="text-xs sm:text-sm text-gray-400 mt-2 sm:mt-3">Enter COBOL code and click Convert to get started</p>
+                      </div>
+                    ) : conversionResult.status === 'processing' ? (
+                      <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                        <Activity className="w-10 h-10 sm:w-12 sm:h-12 text-indigo-500 mx-auto mb-3 sm:mb-4 animate-spin" />
+                        <p className="text-indigo-600 font-medium text-sm sm:text-base">Converting COBOL to Java...</p>
+                        <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">This may take a few moments</p>
+                      </div>
+                    ) : conversionResult.status === 'completed' ? (
+                      <div className="h-full">
+                        {resultsTab === 'java' && (
+                          <div className="h-full overflow-y-auto">
+                            <div className="prose prose-sm max-w-none">
+                              <h3 className="text-lg font-bold text-gray-900 mb-3">Java Code</h3>
+                              <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                                <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white">
+                                  {conversionResult.result?.final_java_code || 'No Java code available'}
+                                </pre>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {resultsTab === 'summary' && (
+                          <div className="h-full overflow-y-auto">
+                            <div className="prose prose-sm max-w-none">
+                              <h3 className="text-lg font-bold text-gray-900 mb-3">Conversion Summary</h3>
+                              <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                                <p className="text-gray-900 whitespace-pre-wrap">
+                                  {conversionResult.result?.summary || 'No summary available'}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {resultsTab === 'pseudo' && (
+                          <div className="h-full overflow-y-auto">
+                            <div className="prose prose-sm max-w-none">
+                              <h3 className="text-lg font-bold text-gray-900 mb-3">Pseudo Code</h3>
+                              <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                                <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white">
+                                  {conversionResult.result?.pseudo_code || 'No pseudo code available'}
+                                </pre>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <div className="space-y-3 sm:space-y-4">
-                        {/* Status */}
-                        <div className="flex items-center space-x-2 sm:space-x-3">
-                          {getStatusIcon()}
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                              {conversionResult.message}
-                            </p>
-                            <p className="text-xs text-gray-500 truncate">
-                              ID: {conversionResult.conversion_id}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* Progress */}
-                        {conversionResult.status === 'processing' && (
-                          <ConversionStatus
-                            progress={conversionResult.progress}
-                            message={conversionResult.message}
-                          />
-                        )}
-
-                        {/* Results */}
-                        {conversionResult.status === 'completed' && conversionResult.result && (
-                          <ResultsViewer result={conversionResult.result} />
-                        )}
-
-                        {/* Download Button */}
-                        {conversionResult.status === 'completed' && (
-                          <button
-                            onClick={handleDownload}
-                            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                          >
-                            <Download className="w-4 h-4 mr-2" />
-                            Download Results
-                          </button>
+                      <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                        <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-rose-500 mx-auto mb-3 sm:mb-4" />
+                        <p className="text-rose-600 font-medium text-sm sm:text-base">Conversion Failed</p>
+                        {conversionResult.error_message && (
+                          <p className="text-xs sm:text-sm text-rose-500 mt-2 sm:mt-3">{conversionResult.error_message}</p>
                         )}
                       </div>
                     )}
@@ -298,9 +310,44 @@ function App() {
                 </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
+
+            {/* Convert Button */}
+            <div className="flex-shrink-0 flex justify-center py-2 sm:py-3">
+              <button
+                onClick={handleConvert}
+                disabled={!cobolCode.trim() || conversionResult?.status === 'processing'}
+                className="flex items-center px-6 sm:px-8 py-2.5 sm:py-3 bg-gradient-to-r from-indigo-500 to-purple-600 text-white font-medium rounded-lg sm:rounded-xl hover:from-indigo-600 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 text-sm sm:text-base"
+              >
+                {conversionResult?.status === 'processing' ? (
+                  <>
+                    <Activity className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 animate-spin" />
+                    <span className="hidden sm:inline">Converting...</span>
+                    <span className="sm:hidden">Converting</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2" />
+                    <span className="hidden sm:inline">Convert to Java</span>
+                    <span className="sm:hidden">Convert</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'upload' && (
+          <div className="h-full flex items-center justify-center p-2 sm:p-4">
+            <FileUploader onFileUpload={handleFileUpload} />
+          </div>
+        )}
+
+        {activeTab === 'dashboard' && (
+          <div className="h-full">
+            <Dashboard />
+          </div>
+        )}
+      </main>
     </div>
   )
 }

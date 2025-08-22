@@ -14,7 +14,8 @@ import {
   FileCode,
   AlertCircle,
   Trash2,
-  Download
+  Download,
+  ArrowLeft
 } from 'lucide-react'
 import { deleteConversion, getConversionDetails, downloadResults } from '../api/conversionApi'
 import CodeEditor from './CodeEditor'
@@ -34,6 +35,7 @@ interface ConversionItem {
   java_files_count: number
   java_files: string[]
   error_message?: string
+  filename?: string // Added for new layout
 }
 
 interface DashboardData {
@@ -49,6 +51,10 @@ interface Stats {
   successful_conversions: number
   failed_conversions: number
   total_java_files: number
+  total: number // Added for new layout
+  completed: number // Added for new layout
+  in_progress: number // Added for new layout
+  failed: number // Added for new layout
 }
 
 const Dashboard: React.FC = () => {
@@ -61,6 +67,10 @@ const Dashboard: React.FC = () => {
   const [detailedConversion, setDetailedConversion] = useState<any>(null)
   const [showEditor, setShowEditor] = useState(false)
   const [loadingDetails, setLoadingDetails] = useState(false)
+  const [searchTerm, setSearchTerm] = useState(''); // Added for new layout
+  const [currentPage, setCurrentPage] = useState(1); // Added for new layout
+  const [pageSize, setPageSize] = useState(10); // Added for new layout
+  const [resultsTab, setResultsTab] = useState('java'); // New state for results tab
 
   const fetchDashboardData = async () => {
     try {
@@ -103,27 +113,27 @@ const Dashboard: React.FC = () => {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'processing':
-        return <Clock className="w-5 h-5 text-yellow-500 animate-spin" />
+        return <Clock className="w-5 h-5 text-amber-500 animate-spin" />
       case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-500" />
+        return <CheckCircle className="w-5 h-5 text-emerald-500" />
       case 'failed':
-        return <XCircle className="w-5 h-5 text-red-500" />
+        return <XCircle className="w-5 h-5 text-rose-500" />
       default:
-        return <AlertCircle className="w-5 h-5 text-gray-500" />
+        return <AlertCircle className="w-5 h-5 text-slate-500" />
     }
   }
 
   const getStatusBadge = (status: string) => {
-    const baseClasses = "px-3 py-1 rounded-full text-xs font-semibold"
+    const baseClasses = "px-3 py-1 rounded-full text-xs font-semibold border-2"
     switch (status) {
       case 'processing':
-        return `${baseClasses} bg-yellow-100 text-yellow-800 border border-yellow-200`
+        return `${baseClasses} bg-gradient-to-r from-amber-100 to-yellow-100 text-amber-800 border-amber-300 shadow-sm`
       case 'completed':
-        return `${baseClasses} bg-green-100 text-green-800 border border-green-200`
+        return `${baseClasses} bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-800 border-emerald-300 shadow-sm`
       case 'failed':
-        return `${baseClasses} bg-red-100 text-red-800 border border-red-200`
+        return `${baseClasses} bg-gradient-to-r from-rose-100 to-red-100 text-rose-800 border-rose-300 shadow-sm`
       default:
-        return `${baseClasses} bg-gray-100 text-gray-800 border border-gray-200`
+        return `${baseClasses} bg-gradient-to-r from-slate-100 to-gray-100 text-slate-800 border-slate-300 shadow-sm`
     }
   }
 
@@ -145,7 +155,7 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const handleDelete = async (conversionId: string) => {
+  const handleDeleteConversion = async (conversionId: string) => {
     if (!confirm('Are you sure you want to delete this conversion? This action cannot be undone.')) {
       return
     }
@@ -160,7 +170,7 @@ const Dashboard: React.FC = () => {
     }
   }
 
-  const handleDownload = async (conversionId: string) => {
+  const handleDownloadResults = async (conversionId: string) => {
     try {
       await downloadResults(conversionId)
     } catch (error) {
@@ -182,167 +192,183 @@ const Dashboard: React.FC = () => {
     return `${minutes}m ${seconds}s`
   }
 
+  // New function to filter conversions based on search term and status
+  const filteredConversions = dashboardData?.conversions.filter(conversion => {
+    const matchesSearchTerm = conversion.conversion_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                              conversion.filename?.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = statusFilter === '' || conversion.status === statusFilter;
+    return matchesSearchTerm && matchesStatus;
+  }) || [];
+
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="flex items-center space-x-2">
-          <Activity className="w-6 h-6 text-blue-500 animate-spin" />
-          <span className="text-gray-600">Loading dashboard...</span>
+      <div className="flex items-center justify-center h-96 bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className="flex items-center space-x-3 bg-white/80 backdrop-blur-sm rounded-xl p-6 shadow-lg border border-white/20">
+          <Activity className="w-8 h-8 text-indigo-500 animate-spin" />
+          <span className="text-indigo-700 font-medium text-lg">Loading dashboard...</span>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-6">
-        {!showEditor && (
-          <>
-            {/* Stats Cards */}
-            {stats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-blue-100 text-sm font-medium">Total Conversions</p>
-                      <p className="text-3xl font-bold">{stats.total_conversions}</p>
-                    </div>
-                    <BarChart3 className="w-8 h-8 text-blue-200" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-green-100 text-sm font-medium">Successful</p>
-                      <p className="text-3xl font-bold">{stats.successful_conversions}</p>
-                    </div>
-                    <CheckCircle className="w-8 h-8 text-green-200" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-red-100 text-sm font-medium">Failed</p>
-                      <p className="text-3xl font-bold">{stats.failed_conversions}</p>
-                    </div>
-                    <XCircle className="w-8 h-8 text-red-200" />
-                  </div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-purple-100 text-sm font-medium">Java Files</p>
-                      <p className="text-3xl font-bold">{stats.total_java_files}</p>
-                    </div>
-                    <FileCode className="w-8 h-8 text-purple-200" />
-                  </div>
-                </div>
-              </div>
-            )}
+    <div className="w-full h-full bg-gradient-to-br from-slate-50 to-blue-50 p-2 sm:p-4 flex flex-col min-h-0">
+      {/* Header */}
+      <div className="flex-shrink-0 mb-3 sm:mb-6">
+        <h1 className="text-xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-1 sm:mb-2">
+          Conversion Dashboard
+        </h1>
+        <p className="text-xs sm:text-base text-gray-600">Monitor and manage your COBOL to Java conversions</p>
+      </div>
 
-            {/* Filters */}
-            <div className="bg-white rounded-lg shadow-sm border p-4">
-              <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-                <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-                  <Activity className="w-5 h-5 mr-2 text-blue-500" />
-                  Conversion History
-                </h2>
-                
-                <div className="flex items-center space-x-3">
-                  <Filter className="w-4 h-4 text-gray-400" />
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => {
-                      setStatusFilter(e.target.value)
-                      setPage(1)
-                    }}
-                    className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="">All Status</option>
-                    <option value="processing">Processing</option>
-                    <option value="completed">Completed</option>
-                    <option value="failed">Failed</option>
-                  </select>
+      {!showEditor ? (
+        <>
+          {/* Stats Cards - Responsive */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4 mb-3 sm:mb-6 flex-shrink-0">
+            <div className="bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-lg sm:rounded-xl p-3 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm opacity-90 font-medium">Total</p>
+                  <p className="text-lg sm:text-3xl font-bold">{stats?.total || 0}</p>
                 </div>
+                <BarChart3 className="w-5 h-5 sm:w-8 sm:h-8 opacity-80" />
               </div>
             </div>
+            <div className="bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 rounded-lg sm:rounded-xl p-3 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm opacity-90 font-medium">Completed</p>
+                  <p className="text-lg sm:text-3xl font-bold">{stats?.completed || 0}</p>
+                </div>
+                <CheckCircle className="w-5 h-5 sm:w-8 sm:h-8 opacity-80" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-lg sm:rounded-xl p-3 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm opacity-90 font-medium">In Progress</p>
+                  <p className="text-lg sm:text-3xl font-bold">{stats?.in_progress || 0}</p>
+                </div>
+                <Clock className="w-5 h-5 sm:w-8 sm:h-8 opacity-80" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-r from-rose-500 via-pink-500 to-purple-500 rounded-lg sm:rounded-xl p-3 sm:p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs sm:text-sm opacity-90 font-medium">Failed</p>
+                  <p className="text-lg sm:text-3xl font-bold">{stats?.failed || 0}</p>
+                </div>
+                <AlertCircle className="w-5 h-5 sm:w-8 sm:h-8 opacity-80" />
+              </div>
+            </div>
+          </div>
 
-            {/* Conversions Table */}
-            {dashboardData && (
-              <div className="bg-white rounded-lg shadow-sm border overflow-hidden">
+          {/* Filters - Responsive */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 p-2 sm:p-4 mb-3 sm:mb-6 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search conversions..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/90"
+                />
+              </div>
+              <div className="flex gap-2">
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white/90"
+                >
+                  <option value="">All Status</option>
+                  <option value="completed">Completed</option>
+                  <option value="processing">Processing</option>
+                  <option value="failed">Failed</option>
+                </select>
+                <button
+                  onClick={() => { setSearchTerm(''); setStatusFilter(''); }}
+                  className="px-4 py-2 bg-gradient-to-r from-gray-500 to-gray-600 text-white rounded-lg hover:from-gray-600 hover:to-gray-700 transition-all duration-200"
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Conversions Table */}
+          <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 flex-1 flex flex-col min-h-0">
+            <div className="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-3 sm:px-6 py-2 sm:py-4 rounded-t-lg sm:rounded-t-xl">
+              <h2 className="text-base sm:text-xl font-bold">Recent Conversions</h2>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              {loading ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Activity className="w-12 h-12 text-indigo-500 mx-auto mb-4 animate-spin" />
+                    <p className="text-indigo-600 font-medium">Loading conversions...</p>
+                  </div>
+                </div>
+              ) : filteredConversions.length === 0 ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Code className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500 font-medium">No conversions found</p>
+                    <p className="text-sm text-gray-400 mt-2">Start by converting some COBOL code</p>
+                  </div>
+                </div>
+              ) : (
                 <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-gray-200">
+                  <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Status
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Created
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Code Size
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Java Files
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Duration
-                        </th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                          Actions
-                        </th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
-                      {dashboardData.conversions.map((conversion) => (
-                        <tr key={conversion.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <div className="flex items-center space-x-2">
-                              {getStatusIcon(conversion.status)}
-                              <span className={getStatusBadge(conversion.status)}>
-                                {conversion.status}
-                              </span>
-                            </div>
+                      {filteredConversions.map((conversion) => (
+                        <tr key={conversion.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                            <div className="text-xs sm:text-sm font-medium text-gray-900">{conversion.filename}</div>
+                            <div className="text-xs text-gray-500">{conversion.conversion_id}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex items-center space-x-2">
-                              <Calendar className="w-4 h-4 text-gray-400" />
-                              <span>{formatDate(conversion.created_at)}</span>
-                            </div>
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              conversion.status === 'completed' 
+                                ? 'bg-gradient-to-r from-emerald-100 to-teal-100 text-emerald-800 border border-emerald-200 shadow-sm' 
+                                : conversion.status === 'processing' 
+                                ? 'bg-gradient-to-r from-amber-100 to-orange-100 text-amber-800 border border-amber-200 shadow-sm' 
+                                : 'bg-gradient-to-r from-rose-100 to-pink-100 text-rose-800 border border-rose-200 shadow-sm'
+                            }`}>
+                              {conversion.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1" />}
+                              {conversion.status === 'processing' && <Clock className="w-3 h-3 mr-1" />}
+                              {conversion.status === 'failed' && <AlertCircle className="w-3 h-3 mr-1" />}
+                              <span className="hidden sm:inline">{conversion.status.replace('_', ' ')}</span>
+                              <span className="sm:hidden">{conversion.status === 'completed' ? 'Done' : conversion.status === 'processing' ? 'Proc' : 'Fail'}</span>
+                            </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex items-center space-x-2">
-                              <Code className="w-4 h-4 text-gray-400" />
-                              <span>{conversion.cobol_code ? conversion.cobol_code.length.toLocaleString() : 0} chars</span>
-                            </div>
+                          <td className="hidden sm:table-cell px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500">
+                            {new Date(conversion.created_at).toLocaleDateString()}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            <div className="flex items-center space-x-2">
-                              <FileCode className="w-4 h-4 text-gray-400" />
-                              <span>{conversion.java_files_count}</span>
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {formatDuration(conversion.created_at, conversion.completed_at)}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                          <td className="px-3 sm:px-6 py-2 sm:py-4 whitespace-nowrap text-xs sm:text-sm font-medium">
                             <button
                               onClick={() => handleViewConversion(conversion)}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                              className="text-indigo-600 hover:text-indigo-900 mr-2 sm:mr-3 flex items-center"
                             >
-                              <Eye className="w-3 h-3 mr-1" />
-                              View
+                              <Code className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              <span className="hidden sm:inline">View</span>
+                              <span className="sm:hidden">V</span>
                             </button>
                             <button
-                              onClick={() => handleDelete(conversion.conversion_id)}
-                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                              onClick={() => handleDeleteConversion(conversion.conversion_id)}
+                              className="text-rose-600 hover:text-rose-900 flex items-center"
                             >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Delete
+                              <Trash2 className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
+                              <span className="hidden sm:inline">Delete</span>
+                              <span className="sm:hidden">D</span>
                             </button>
                           </td>
                         </tr>
@@ -350,204 +376,224 @@ const Dashboard: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
+              )}
+            </div>
+          </div>
 
-                {/* Pagination */}
-                {dashboardData.total_pages > 1 && (
-                  <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-                    <div className="flex-1 flex justify-between sm:hidden">
-                      <button
-                        onClick={() => setPage(Math.max(1, page - 1))}
-                        disabled={page === 1}
-                        className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Previous
-                      </button>
-                      <button
-                        onClick={() => setPage(Math.min(dashboardData.total_pages, page + 1))}
-                        disabled={page === dashboardData.total_pages}
-                        className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Next
-                      </button>
-                    </div>
-                    
-                    <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                      <div>
-                        <p className="text-sm text-gray-700">
-                          Showing{' '}
-                          <span className="font-medium">{(page - 1) * dashboardData.limit + 1}</span>{' '}
-                          to{' '}
-                          <span className="font-medium">
-                            {Math.min(page * dashboardData.limit, dashboardData.total)}
-                          </span>{' '}
-                          of <span className="font-medium">{dashboardData.total}</span> results
-                        </p>
-                      </div>
-                      <div>
-                        <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                          <button
-                            onClick={() => setPage(Math.max(1, page - 1))}
-                            disabled={page === 1}
-                            className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-                          
-                          {Array.from({ length: dashboardData.total_pages }, (_, i) => i + 1).map((pageNum) => (
-                            <button
-                              key={pageNum}
-                              onClick={() => setPage(pageNum)}
-                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                                pageNum === page
-                                  ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                              }`}
-                            >
-                              {pageNum}
-                            </button>
-                          ))}
-                          
-                          <button
-                            onClick={() => setPage(Math.min(dashboardData.total_pages, page + 1))}
-                            disabled={page === dashboardData.total_pages}
-                            className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </nav>
-                      </div>
-                    </div>
-                  </div>
-                )}
+          {/* Pagination - Responsive */}
+          {filteredConversions.length > 0 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center mt-3 sm:mt-4 gap-2 sm:gap-0 flex-shrink-0">
+              <div className="text-xs sm:text-sm text-gray-700 text-center sm:text-left">
+                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, filteredConversions.length)} of {filteredConversions.length} results
               </div>
-            )}
-          </>
-        )}
-
-        {showEditor && selectedConversion && (
-          <div className="space-y-6">
-            {/* Back Button */}
-            <div className="flex items-center justify-between">
-              <button
-                onClick={() => {
-                  setShowEditor(false)
-                  setSelectedConversion(null)
-                  setDetailedConversion(null)
-                }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
-              </button>
-              <div className="flex items-center space-x-2">
-                <span className={getStatusBadge(selectedConversion.status)}>
-                  {selectedConversion.status}
-                </span>
-                {selectedConversion.status === 'completed' && (
-                  <button
-                    onClick={() => handleDownload(selectedConversion.conversion_id)}
-                    className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-green-700 bg-green-100 hover:bg-green-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                  >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
-                  </button>
-                )}
+              <div className="flex space-x-1 sm:space-x-2">
                 <button
-                  onClick={() => handleDelete(selectedConversion.conversion_id)}
-                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-red-700 bg-red-100 hover:bg-red-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
+                  <span className="hidden sm:inline">Previous</span>
+                  <span className="sm:hidden">Prev</span>
+                </button>
+                <span className="px-2 sm:px-3 py-1 text-xs sm:text-sm text-gray-700">
+                  Page {currentPage} of {Math.ceil(filteredConversions.length / pageSize)}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(Math.ceil(filteredConversions.length / pageSize), prev + 1))}
+                  disabled={currentPage >= Math.ceil(filteredConversions.length / pageSize)}
+                  className="px-2 sm:px-3 py-1 border border-gray-300 rounded text-xs sm:text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  <span className="hidden sm:inline">Next</span>
+                  <span className="sm:hidden">Next</span>
                 </button>
               </div>
             </div>
-
-            {/* Conversion Info */}
-            <div className="bg-white rounded-lg shadow-sm border p-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          )}
+        </>
+      ) : selectedConversion && (
+        <div className="h-full flex flex-col min-h-0">
+          {/* Editor Header */}
+          <div className="flex-shrink-0 bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 p-2 sm:p-4 mb-2 sm:mb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-0">
+              <div className="flex items-center space-x-2 sm:space-x-4">
+                <button
+                  onClick={() => setShowEditor(false)}
+                  className="flex items-center text-indigo-600 hover:text-indigo-800 transition-colors text-sm"
+                >
+                  <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Back to Dashboard</span>
+                  <span className="sm:hidden">Back</span>
+                </button>
                 <div>
-                  <label className="text-gray-500">Created</label>
-                  <p className="font-medium text-gray-900">{formatDate(selectedConversion.created_at)}</p>
-                </div>
-                <div>
-                  <label className="text-gray-500">COBOL Code Size</label>
-                  <p className="font-medium text-gray-900">
-                    {detailedConversion?.cobol_code ? detailedConversion.cobol_code.length.toLocaleString() : 
-                     selectedConversion.cobol_code ? selectedConversion.cobol_code.length.toLocaleString() : 0} characters
-                  </p>
-                </div>
-                <div>
-                  <label className="text-gray-500">Java Files</label>
-                  <p className="font-medium text-gray-900">{detailedConversion?.java_files_count || selectedConversion.java_files_count}</p>
+                  <h2 className="text-base sm:text-xl font-bold text-gray-900">{selectedConversion.filename}</h2>
+                  <p className="text-xs sm:text-sm text-gray-500">ID: {selectedConversion.conversion_id}</p>
                 </div>
               </div>
-              {(detailedConversion?.prior_knowledge || selectedConversion.prior_knowledge) && (
-                <div className="mt-4">
-                  <label className="text-gray-500">Prior Knowledge</label>
-                  <p className="text-sm text-gray-900 mt-1">{detailedConversion?.prior_knowledge || selectedConversion.prior_knowledge}</p>
-                </div>
+              {selectedConversion.status === 'completed' && (
+                <button
+                  onClick={() => handleDownloadResults(selectedConversion.conversion_id)}
+                  className="flex items-center px-2 sm:px-4 py-1 sm:py-2 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded sm:rounded-lg hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl text-xs sm:text-sm self-start sm:self-auto"
+                >
+                  <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Download Results</span>
+                  <span className="sm:hidden">Download</span>
+                </button>
               )}
             </div>
+          </div>
 
-            {/* COBOL Code - Full Width */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6">Original COBOL Code</h3>
-                <CodeEditor
-                  value={detailedConversion?.cobol_code || selectedConversion.cobol_code || ''}
-                  onChange={() => {}} // Read-only
-                  language="cobol"
-                  placeholder="No COBOL code available"
-                  height="h-96 sm:h-[32rem]"
-                />
+          {/* COBOL Code and Results - Two Column Layout with Tabs */}
+          <div className="flex-1 flex flex-col lg:flex-row gap-3 sm:gap-4 min-h-0">
+            {/* Left Column - COBOL Code */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 p-3 sm:p-4 flex-1 flex flex-col min-h-0">
+                <h3 className="text-sm sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center flex-shrink-0">
+                  <Code className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 text-indigo-600" />
+                  <span className="hidden sm:inline">Original COBOL Code</span>
+                  <span className="sm:hidden">COBOL Code</span>
+                </h3>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  <div className="prose prose-sm max-w-none">
+                    <h3 className="text-lg font-bold text-gray-900 mb-3">Original COBOL Code</h3>
+                    <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                      <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white">
+                        {detailedConversion?.cobol_code || selectedConversion.cobol_code || 'No COBOL code available'}
+                      </pre>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Conversion Results - Full Width */}
-            <div className="space-y-4">
-              <div className="bg-white rounded-lg shadow-sm border p-6">
-                <h3 className="text-xl font-semibold text-gray-900 mb-6">Conversion Results</h3>
-                {loadingDetails ? (
-                  <div className="text-center py-8">
-                    <Activity className="w-12 h-12 text-blue-500 mx-auto mb-4 animate-spin" />
-                    <p className="text-blue-600 font-medium">Loading conversion details...</p>
-                    <p className="text-sm text-gray-500 mt-2">Fetching data from database</p>
-                  </div>
-                ) : selectedConversion.status === 'completed' && detailedConversion ? (
-                  <>
-                    {/* Debug info */}
-                    <div className="mb-4 p-4 bg-gray-100 rounded text-xs">
-                      <strong>Debug Info:</strong><br/>
-                      Status: {detailedConversion.status}<br/>
-                      Has final_java_code: {detailedConversion.final_java_code ? 'Yes' : 'No'}<br/>
-                      Java code length: {detailedConversion.final_java_code?.length || 0}<br/>
-                      Has pseudo_code: {detailedConversion.pseudo_code ? 'Yes' : 'No'}<br/>
-                      Has summary: {detailedConversion.summary ? 'Yes' : 'No'}
-                    </div>
-                    <ResultsViewer result={detailedConversion} />
-                  </>
-                ) : selectedConversion.status === 'completed' && selectedConversion.result ? (
-                  <ResultsViewer result={selectedConversion.result} />
-                ) : selectedConversion.status === 'failed' ? (
-                  <div className="text-center py-8">
-                    <XCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-                    <p className="text-red-600 font-medium">Conversion Failed</p>
-                    {(detailedConversion?.error_message || selectedConversion.error_message) && (
-                      <p className="text-sm text-red-500 mt-2">{detailedConversion?.error_message || selectedConversion.error_message}</p>
+            {/* Right Column - Conversion Results with Tabs */}
+            <div className="flex-1 flex flex-col min-h-0">
+              <div className="bg-white/80 backdrop-blur-sm rounded-lg sm:rounded-xl shadow-lg border border-white/20 flex-1 flex flex-col min-h-0">
+                {/* Results Header with Tabs */}
+                <div className="flex-shrink-0 border-b border-gray-200">
+                  <div className="flex items-center justify-between p-3 sm:p-4">
+                    <h3 className="text-sm sm:text-lg font-bold text-gray-900 flex items-center">
+                      <FileCode className="w-4 h-4 sm:w-5 sm:h-5 mr-1.5 sm:mr-2 text-emerald-600" />
+                      <span className="hidden sm:inline">Conversion Results</span>
+                      <span className="sm:hidden">Results</span>
+                    </h3>
+                    {selectedConversion.status === 'completed' && (
+                      <button
+                        onClick={() => handleDownloadResults(selectedConversion.conversion_id)}
+                        className="flex items-center px-2 sm:px-3 py-1 sm:py-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded text-xs sm:text-sm hover:from-emerald-600 hover:to-teal-700 transition-all duration-200 shadow-lg hover:shadow-xl"
+                      >
+                        <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-1.5" />
+                        <span className="hidden sm:inline">Download</span>
+                        <span className="sm:hidden">DL</span>
+                      </button>
                     )}
                   </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <Clock className="w-12 h-12 text-yellow-500 mx-auto mb-4 animate-spin" />
-                    <p className="text-yellow-600 font-medium">Processing...</p>
-                    <p className="text-sm text-gray-500 mt-2">This conversion is still in progress</p>
+                  
+                  {/* Tabs */}
+                  <div className="flex border-b border-gray-200">
+                    <button
+                      onClick={() => setResultsTab('java')}
+                      className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                        resultsTab === 'java'
+                          ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">Java Code</span>
+                      <span className="sm:hidden">Java</span>
+                    </button>
+                    <button
+                      onClick={() => setResultsTab('summary')}
+                      className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                        resultsTab === 'summary'
+                          ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">Summary</span>
+                      <span className="sm:hidden">Sum</span>
+                    </button>
+                    <button
+                      onClick={() => setResultsTab('pseudo')}
+                      className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-colors ${
+                        resultsTab === 'pseudo'
+                          ? 'border-emerald-500 text-emerald-600 bg-emerald-50'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      <span className="hidden sm:inline">Pseudo Code</span>
+                      <span className="sm:hidden">Pseudo</span>
+                    </button>
                   </div>
-                )}
+                </div>
+
+                {/* Tab Content */}
+                <div className="flex-1 min-h-0 p-3 sm:p-4">
+                  {loadingDetails ? (
+                    <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                      <Activity className="w-10 h-10 sm:w-12 sm:h-12 text-indigo-500 mx-auto mb-3 sm:mb-4 animate-spin" />
+                      <p className="text-indigo-600 font-medium text-sm sm:text-base">Loading conversion details...</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">Fetching data from database</p>
+                    </div>
+                  ) : selectedConversion.status === 'completed' && detailedConversion ? (
+                    <div className="h-full">
+                      {resultsTab === 'java' && (
+                        <div className="h-full overflow-y-auto">
+                          <div className="prose prose-sm max-w-none">
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Java Code</h3>
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                              <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white">
+                                {detailedConversion.final_java_code || 'No Java code available'}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {resultsTab === 'summary' && (
+                        <div className="h-full overflow-y-auto">
+                          <div className="prose prose-sm max-w-none">
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Conversion Summary</h3>
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                              <p className="text-gray-900 whitespace-pre-wrap">
+                                {detailedConversion.summary || 'No summary available'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {resultsTab === 'pseudo' && (
+                        <div className="h-full overflow-y-auto">
+                          <div className="prose prose-sm max-w-none">
+                            <h3 className="text-lg font-bold text-gray-900 mb-3">Pseudo Code</h3>
+                            <div className="bg-white rounded-lg p-4 mb-4 border border-gray-200">
+                              <pre className="text-sm text-gray-900 whitespace-pre-wrap font-mono bg-white">
+                                {detailedConversion.pseudo_code || 'No pseudo code available'}
+                              </pre>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedConversion.status === 'failed' ? (
+                    <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                      <XCircle className="w-10 h-10 sm:w-12 sm:h-12 text-rose-500 mx-auto mb-3 sm:mb-4" />
+                      <p className="text-rose-600 font-medium text-sm sm:text-base">Conversion Failed</p>
+                      {(detailedConversion?.error_message || selectedConversion.error_message) && (
+                        <p className="text-xs sm:text-sm text-rose-500 mt-2 sm:mt-3">{detailedConversion?.error_message || selectedConversion.error_message}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 sm:py-8 h-full flex flex-col items-center justify-center">
+                      <Clock className="w-10 h-10 sm:w-12 sm:h-12 text-amber-500 mx-auto mb-3 sm:mb-4 animate-spin" />
+                      <p className="text-amber-600 font-medium text-sm sm:text-base">Processing...</p>
+                      <p className="text-xs sm:text-sm text-gray-500 mt-2 sm:mt-3">This conversion is still in progress</p>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
