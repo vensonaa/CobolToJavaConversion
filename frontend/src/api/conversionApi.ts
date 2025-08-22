@@ -98,6 +98,8 @@ export const uploadFile = async (file: File): Promise<ConversionResponse> => {
   }
 }
 
+
+
 export const listConversions = async () => {
   try {
     const response = await api.get('/conversions')
@@ -110,13 +112,25 @@ export const listConversions = async () => {
   }
 }
 
-export const deleteConversion = async (conversionId: string) => {
+export const deleteConversion = async (conversionId: string): Promise<any> => {
   try {
     const response = await api.delete(`/conversions/${conversionId}`)
     return response.data
   } catch (error) {
     if (axios.isAxiosError(error)) {
       throw new Error(error.response?.data?.detail || 'Failed to delete conversion')
+    }
+    throw error
+  }
+}
+
+export const getConversionDetails = async (conversionId: string): Promise<any> => {
+  try {
+    const response = await api.get(`/conversions/${conversionId}/details`)
+    return response.data
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.detail || 'Failed to get conversion details')
     }
     throw error
   }

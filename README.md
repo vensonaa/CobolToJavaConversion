@@ -43,6 +43,12 @@ This project implements a **7-agent workflow** using LangGraph for intelligent C
 - **REST API**: FastAPI backend with comprehensive endpoints
 - **Separate Java Files**: Generates individual Java class files
 - **Chunking Strategy**: Handles large COBOL programs efficiently
+- **Dashboard**: Conversion history with statistics and management
+- **Download Functionality**: Download conversion results as ZIP files
+- **Delete Functionality**: Remove conversions and clean up files
+- **Database Persistence**: SQLite database for conversion history
+- **Real-time Updates**: Live status updates during conversion
+- **Responsive Design**: Works on desktop, tablet, and mobile
 
 ## 📋 Prerequisites
 
@@ -85,10 +91,38 @@ This will start:
 ### Web Interface
 
 1. Open http://localhost:5173 in your browser
-2. Enter COBOL code or upload a COBOL file
-3. Add optional prior knowledge
-4. Click "Convert to Java"
+2. Navigate between three main sections:
+   - **Code Editor**: Enter COBOL code directly
+   - **File Upload**: Upload COBOL files for conversion
+   - **Dashboard**: View conversion history and manage results
+
+#### Dashboard Features
+
+The dashboard provides comprehensive conversion management:
+
+- **Statistics Overview**: View total conversions, success rates, and generated files
+- **Conversion History**: Browse all past conversions with pagination
+- **Status Filtering**: Filter by processing, completed, or failed conversions
+- **Download Results**: Download conversion results as ZIP files containing:
+  - Generated Java source files
+  - Pseudo code documentation
+  - Conversion summary reports
+- **Delete Conversions**: Remove conversions and clean up associated files
+- **Detailed View**: Click "View" to see full conversion details including:
+  - Original COBOL code
+  - Generated Java code
+  - Pseudo code explanation
+  - Conversion summary
+- **Real-time Updates**: Live status updates during conversion process
+
+#### Conversion Process
+
+1. Enter COBOL code or upload a COBOL file
+2. Add optional prior knowledge for better conversion
+3. Click "Convert to Java"
+4. Monitor progress in real-time
 5. View results and download generated files
+6. Manage conversions through the dashboard
 
 ### Command Line
 

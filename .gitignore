@@ -5,3 +5,5 @@ api/__pycache__/main.cpython-311.pyc
 /frontend/node_modules
 /venv
 /utils/__pycache__
+/api/__pycache__
+/frontend/dist

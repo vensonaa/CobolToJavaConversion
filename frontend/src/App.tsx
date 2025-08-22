@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
-import { Upload, Code, Download, Play, AlertCircle, CheckCircle, Clock } from 'lucide-react'
+import { Upload, Code, Download, Play, AlertCircle, CheckCircle, Clock, BarChart3 } from 'lucide-react'
 import CodeEditor from './components/CodeEditor'
 import FileUploader from './components/FileUploader'
 import ConversionStatus from './components/ConversionStatus'
 import ResultsViewer from './components/ResultsViewer'
+import Dashboard from './components/Dashboard'
 import { convertCobol, getConversionStatus, downloadResults } from './api/conversionApi'
 import './index.css'
 
@@ -20,7 +21,7 @@ function App() {
   const [priorKnowledge, setPriorKnowledge] = useState('')
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null)
   const [isConverting, setIsConverting] = useState(false)
-  const [activeTab, setActiveTab] = useState<'editor' | 'upload'>('editor')
+  const [activeTab, setActiveTab] = useState<'editor' | 'upload' | 'dashboard'>('editor')
 
   const handleConvert = async () => {
     if (!cobolCode.trim()) {
@@ -101,9 +102,9 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
+    <div className="h-screen bg-gray-50 overflow-x-hidden flex flex-col">
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b flex-shrink-0">
         <div className="w-full px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center py-4 sm:py-6 gap-4">
             <div className="flex items-center space-x-2 sm:space-x-3">
@@ -124,158 +125,180 @@ function App() {
         </div>
       </header>
 
-      <div className="w-full px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
-          {/* Input Section */}
-          <div className="space-y-4 sm:space-y-6 w-full">
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg text-xs sm:text-sm">
-              <button
-                onClick={() => setActiveTab('editor')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'editor'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Code className="w-4 h-4 inline mr-2" />
-                Code Editor
-              </button>
-              <button
-                onClick={() => setActiveTab('upload')}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
-                  activeTab === 'upload'
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
-                }`}
-              >
-                <Upload className="w-4 h-4 inline mr-2" />
-                File Upload
-              </button>
-            </div>
+      <div className="flex-1 w-full flex flex-col">
+        {/* Main Navigation */}
+        <div className="px-4 sm:px-6 lg:px-8 py-4">
+          <nav className="flex space-x-1 bg-white p-1 rounded-lg shadow-sm border text-sm">
+            <button
+              onClick={() => setActiveTab('editor')}
+              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+                activeTab === 'editor'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Code className="w-4 h-4 inline mr-2" />
+              Code Editor
+            </button>
+            <button
+              onClick={() => setActiveTab('upload')}
+              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+                activeTab === 'upload'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <Upload className="w-4 h-4 inline mr-2" />
+              File Upload
+            </button>
+            <button
+              onClick={() => setActiveTab('dashboard')}
+              className={`flex-1 py-3 px-4 rounded-md font-medium transition-all duration-200 ${
+                activeTab === 'dashboard'
+                  ? 'bg-blue-600 text-white shadow-md'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4 inline mr-2" />
+              Dashboard
+            </button>
+          </nav>
+        </div>
 
-            {/* Input Content */}
-            {activeTab === 'editor' ? (
-              <div className="space-y-3 sm:space-y-4">
-                <div>
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-2 gap-1">
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700">
-                      COBOL Code
-                    </label>
-                    <span className="text-xs text-gray-500">
-                      {cobolCode.length.toLocaleString()} characters
-                    </span>
-                  </div>
-                  <CodeEditor
-                    value={cobolCode}
-                    onChange={setCobolCode}
-                    language="cobol"
-                    placeholder="Enter your COBOL code here..."
-                  />
-                  {cobolCode.length > 10000 && cobolCode.length <= 50000 && (
-                    <p className="text-xs text-blue-600 mt-1 px-2">
-                      Large file detected. The system will automatically chunk this for processing.
-                    </p>
-                  )}
-                  {cobolCode.length > 50000 && (
-                    <p className="text-xs text-orange-600 mt-1 px-2">
-                      Very large file detected. Processing may take several minutes.
-                    </p>
-                  )}
-                </div>
+                {/* Main Content Area */}
+        <div className="flex-1 w-full">
+          {activeTab === 'dashboard' ? (
+            <Dashboard />
+          ) : (
+            <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-8">
+                {/* Input Section */}
+                <div className="space-y-4 sm:space-y-6 w-full">
+                  {/* Input Content */}
+                  {activeTab === 'editor' ? (
+                    <div className="space-y-3 sm:space-y-4">
+                      <div className="bg-white rounded-lg shadow-sm border p-4">
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-3 gap-1">
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                            COBOL Code
+                          </label>
+                          <span className="text-xs text-gray-500">
+                            {cobolCode.length.toLocaleString()} characters
+                          </span>
+                        </div>
+                        <CodeEditor
+                          value={cobolCode}
+                          onChange={setCobolCode}
+                          language="cobol"
+                          placeholder="Enter your COBOL code here..."
+                        />
+                        {cobolCode.length > 10000 && cobolCode.length <= 50000 && (
+                          <p className="text-xs text-blue-600 mt-2">
+                            Large file detected. The system will automatically chunk this for processing.
+                          </p>
+                        )}
+                        {cobolCode.length > 50000 && (
+                          <p className="text-xs text-orange-600 mt-2">
+                            Very large file detected. Processing may take several minutes.
+                          </p>
+                        )}
+                      </div>
 
-                                  <div>
-                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">
-                      Prior Knowledge (Optional)
-                    </label>
-                  <textarea
-                    value={priorKnowledge}
-                    onChange={(e) => setPriorKnowledge(e.target.value)}
-                    rows={2}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 resize-none"
-                    placeholder="Additional context or requirements for the conversion..."
-                  />
-                </div>
+                      <div className="bg-white rounded-lg shadow-sm border p-4">
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-3">
+                          Prior Knowledge (Optional)
+                        </label>
+                        <textarea
+                          value={priorKnowledge}
+                          onChange={(e) => setPriorKnowledge(e.target.value)}
+                          rows={2}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-xs sm:text-sm resize-none"
+                          placeholder="Additional context or requirements for the conversion..."
+                        />
+                      </div>
 
-                <button
-                  onClick={handleConvert}
-                  disabled={isConverting || !cobolCode.trim()}
-                  className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {isConverting ? (
-                    <>
-                      <Clock className="w-4 h-4 mr-2 animate-spin" />
-                      Converting...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-4 h-4 mr-2" />
-                      Convert to Java
-                    </>
-                  )}
-                </button>
-              </div>
-            ) : (
-              <FileUploader onFileUpload={handleFileUpload} />
-            )}
-          </div>
-
-          {/* Results Section */}
-          <div className="space-y-4 sm:space-y-6 w-full">
-            <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
-              <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
-                Conversion Results
-              </h2>
-
-              {!conversionResult ? (
-                <div className="text-center py-8 sm:py-12">
-                  <Code className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
-                  <p className="text-sm sm:text-base text-gray-500">
-                    Start a conversion to see results here
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 sm:space-y-4">
-                  {/* Status */}
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    {getStatusIcon()}
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
-                        {conversionResult.message}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        ID: {conversionResult.conversion_id}
-                      </p>
+                      <button
+                        onClick={handleConvert}
+                        disabled={isConverting || !cobolCode.trim()}
+                        className="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                        {isConverting ? (
+                          <>
+                            <Clock className="w-4 h-4 mr-2 animate-spin" />
+                            Converting...
+                          </>
+                        ) : (
+                          <>
+                            <Play className="w-4 h-4 mr-2" />
+                            Convert to Java
+                          </>
+                        )}
+                      </button>
                     </div>
-                  </div>
-
-                  {/* Progress */}
-                  {conversionResult.status === 'processing' && (
-                    <ConversionStatus
-                      progress={conversionResult.progress}
-                      message={conversionResult.message}
-                    />
-                  )}
-
-                  {/* Results */}
-                  {conversionResult.status === 'completed' && conversionResult.result && (
-                    <ResultsViewer result={conversionResult.result} />
-                  )}
-
-                  {/* Download Button */}
-                  {conversionResult.status === 'completed' && (
-                    <button
-                      onClick={handleDownload}
-                      className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download Results
-                    </button>
+                  ) : (
+                    <FileUploader onFileUpload={handleFileUpload} />
                   )}
                 </div>
-              )}
+
+                {/* Results Section */}
+                <div className="space-y-4 sm:space-y-6 w-full">
+                  <div className="bg-white rounded-lg shadow-sm border p-4 sm:p-6">
+                    <h2 className="text-base sm:text-lg font-medium text-gray-900 mb-3 sm:mb-4">
+                      Conversion Results
+                    </h2>
+
+                    {!conversionResult ? (
+                      <div className="text-center py-8 sm:py-12">
+                        <Code className="w-8 h-8 sm:w-12 sm:h-12 text-gray-400 mx-auto mb-3 sm:mb-4" />
+                        <p className="text-sm sm:text-base text-gray-500">
+                          Start a conversion to see results here
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3 sm:space-y-4">
+                        {/* Status */}
+                        <div className="flex items-center space-x-2 sm:space-x-3">
+                          {getStatusIcon()}
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                              {conversionResult.message}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              ID: {conversionResult.conversion_id}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Progress */}
+                        {conversionResult.status === 'processing' && (
+                          <ConversionStatus
+                            progress={conversionResult.progress}
+                            message={conversionResult.message}
+                          />
+                        )}
+
+                        {/* Results */}
+                        {conversionResult.status === 'completed' && conversionResult.result && (
+                          <ResultsViewer result={conversionResult.result} />
+                        )}
+
+                        {/* Download Button */}
+                        {conversionResult.status === 'completed' && (
+                          <button
+                            onClick={handleDownload}
+                            className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Download Results
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
