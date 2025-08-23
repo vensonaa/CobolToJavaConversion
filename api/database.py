@@ -38,6 +38,9 @@ class ConversionHistory(Base):
     summary = Column(Text, nullable=True)
     java_files_count = Column(Integer, default=0)
     
+    # Mainframe Analysis Document
+    mad_analysis = Column(Text, nullable=True)
+    
     # Error handling
     error_message = Column(Text, nullable=True)
     
@@ -59,6 +62,7 @@ class ConversionHistory(Base):
             "pseudo_code": self.pseudo_code,
             "summary": self.summary,
             "java_files_count": self.java_files_count,
+            "mad_analysis": self.mad_analysis,
             "error_message": self.error_message
         }
             

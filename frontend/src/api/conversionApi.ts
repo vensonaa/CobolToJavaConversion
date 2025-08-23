@@ -156,3 +156,15 @@ export const getConversionDetails = async (conversionId: string): Promise<any> =
     throw error
   }
 }
+
+export const getMadAnalysis = async (conversionId: string): Promise<any> => {
+  try {
+    const response = await api.get(`/conversions/${conversionId}/mad`)
+    return response.data
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(error.response?.data?.detail || 'Failed to get MAD analysis')
+    }
+    throw error
+  }
+}

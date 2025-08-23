@@ -49,6 +49,7 @@ This project implements a **7-agent workflow** using LangGraph for intelligent C
 - **Database Persistence**: SQLite database for conversion history
 - **Real-time Updates**: Live status updates during conversion
 - **Responsive Design**: Works on desktop, tablet, and mobile
+- **MAD Analysis**: Comprehensive Mainframe Analysis Document generation
 
 ## 📋 Prerequisites
 
@@ -113,6 +114,7 @@ The dashboard provides comprehensive conversion management:
   - Generated Java code
   - Pseudo code explanation
   - Conversion summary
+  - MAD (Mainframe Analysis Document)
 - **Real-time Updates**: Live status updates during conversion process
 
 #### Conversion Process
@@ -154,6 +156,12 @@ curl "http://localhost:8000/api/status/{conversion_id}"
 
 # Download results
 curl "http://localhost:8000/api/download/{conversion_id}" -o results.zip
+
+# Get MAD analysis
+curl "http://localhost:8000/api/conversions/{conversion_id}/mad"
+
+# Get conversion details
+curl "http://localhost:8000/api/conversions/{conversion_id}/details"
 ```
 
 ## 📁 Project Structure
@@ -180,7 +188,8 @@ CobolToJavaConversion/
 │       └── components/            # React components
 ├── utils/                          # Utility functions
 │   ├── file_utils.py              # File operations
-│   └── java_file_generator.py     # Java file generation
+│   ├── java_file_generator.py     # Java file generation
+│   └── mad_generator.py           # MAD (Mainframe Analysis Document) generator
 ├── examples/                       # Example scripts
 │   └── complex_cobol_example.py   # Complex COBOL conversion
 ├── samples/                        # Sample COBOL files
@@ -191,6 +200,7 @@ CobolToJavaConversion/
     ├── *.java                     # Individual Java classes
     ├── *_pseudo.txt              # Pseudo code analysis
     ├── *_summary.txt             # Conversion summaries
+    ├── *_mad.txt                 # MAD analysis documents
     └── *_complete.json           # Complete conversion results
 ```
 
@@ -261,6 +271,63 @@ Program: HelloWorld
 - Terminate the program
 ```
 
+### MAD Analysis
+```
+MAINFRAME ANALYSIS DOCUMENT (MAD)
+Generated on: 2024-01-15 10:30:00
+=====================================
+
+1. PROGRAM OVERVIEW
+-------------------
+Program Name: HELLO-WORLD
+Author: Unknown
+Date Written: Unknown
+
+2. CODE COMPLEXITY ANALYSIS
+---------------------------
+Total Lines: 5
+Code Lines: 4
+Comment Lines: 0
+Comment Ratio: 0.0%
+Cyclomatic Complexity: 1
+Complexity Level: Low
+
+3. DATA STRUCTURES
+------------------
+Found 0 main data structures
+
+4. BUSINESS LOGIC PATTERNS
+--------------------------
+Perform Statements: 0
+If Statements: 0
+Evaluate Statements: 0
+Call Statements: 0
+Arithmetic Operations: 0
+File Operations: 0
+
+5. DEPENDENCIES
+---------------
+Found 0 dependencies
+
+6. MODERNIZATION RISKS
+----------------------
+Found 0 potential risks
+
+7. RECOMMENDATIONS
+------------------
+1. Implement comprehensive unit testing for converted Java code
+2. Consider using modern Java frameworks for better maintainability
+3. Document business rules and requirements clearly
+4. Plan for gradual migration rather than big-bang conversion
+
+10. ESTIMATED EFFORT
+--------------------
+Based on complexity metrics:
+- Development Time: 2-4 weeks
+- Testing Time: 1-2 weeks
+- Documentation: 1 week
+```
+
 ## 🔍 Advanced Features
 
 ### File I/O Support
@@ -287,6 +354,21 @@ The system can handle complex COBOL file operations:
 - Per-chunk processing through the workflow
 - Result combination and aggregation
 - Handles context length limitations
+
+### MAD (Mainframe Analysis Document)
+The system generates comprehensive analysis documents for uploaded COBOL code:
+
+- **Program Overview**: Basic program information and metadata
+- **Complexity Analysis**: Code metrics including cyclomatic complexity
+- **Data Structure Analysis**: Identification of COBOL data structures
+- **Business Logic Patterns**: Analysis of control flow and operations
+- **Dependency Mapping**: External dependencies and file operations
+- **Modernization Risks**: Identification of potential conversion issues
+- **Recommendations**: Strategic guidance for conversion approach
+- **Effort Estimation**: Time and resource estimates for conversion
+- **Conversion Strategy**: Phased approach recommendations
+
+The MAD provides valuable insights for planning and executing COBOL to Java conversions.
 
 ## 🚨 Error Handling
 

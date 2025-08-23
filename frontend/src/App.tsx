@@ -22,7 +22,7 @@ function App() {
   const [conversionResult, setConversionResult] = useState<ConversionResult | null>(null)
   const [isConverting, setIsConverting] = useState(false)
   const [activeTab, setActiveTab] = useState<'editor' | 'dashboard'>('editor')
-  const [resultsTab, setResultsTab] = useState<'java' | 'summary' | 'pseudo'>('java')
+  const [resultsTab, setResultsTab] = useState<'java' | 'summary' | 'pseudo' | 'mad'>('java')
 
   // Debug: Monitor conversion result changes
   useEffect(() => {
@@ -104,6 +104,7 @@ function App() {
                 java_code: detailedData.java_code || '',
                 pseudo_code: detailedData.pseudo_code || '',
                 summary: detailedData.summary || '',
+                mad_analysis: detailedData.mad_analysis || '',
                 total_chunks: detailedData.total_chunks || 0,
                 java_files: detailedData.java_files || []
               }
@@ -163,6 +164,7 @@ function App() {
           final_java_code: conversionResult.final_java_code || conversionResult.java_code,
           pseudo_code: conversionResult.pseudo_code,
           summary: conversionResult.summary,
+          mad_analysis: conversionResult.mad_analysis,
           total_chunks: conversionResult.total_chunks,
           java_files: conversionResult.java_files || []
         }
@@ -379,6 +381,17 @@ function App() {
                         <span className="hidden sm:inline">Pseudo Code</span>
                         <span className="sm:hidden">Pseudo</span>
                       </button>
+                      <button
+                        onClick={() => setResultsTab('mad')}
+                        className={`flex-1 px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm font-medium border-b-2 transition-all duration-200 ${
+                          resultsTab === 'mad'
+                            ? 'border-emerald-500 text-emerald-700 bg-gradient-to-r from-emerald-100 to-green-100'
+                            : 'border-transparent text-green-600 hover:text-green-700 hover:bg-gradient-to-r hover:from-green-50 hover:to-emerald-50'
+                        }`}
+                      >
+                        <span className="hidden sm:inline">MAD Analysis</span>
+                        <span className="sm:hidden">MAD</span>
+                      </button>
                     </div>
                   </div>
 
@@ -463,6 +476,23 @@ function App() {
                                 <pre className="text-sm text-green-900 whitespace-pre-wrap font-mono bg-transparent">
                                   {conversionResult.result?.pseudo_code || 'No pseudo code available'}
                                 </pre>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                        {resultsTab === 'mad' && (
+                          <div className="h-full overflow-y-auto">
+                            <div className="prose prose-sm max-w-none">
+                              <h3 className="text-lg font-bold text-green-900 mb-3">Mainframe Analysis Document (MAD)</h3>
+                              <div className="bg-gradient-to-br from-white to-green-50 rounded-lg p-4 mb-4 border-2 border-green-200 shadow-lg">
+                                <pre className="text-sm text-green-900 whitespace-pre-wrap font-mono bg-transparent">
+                                  {conversionResult.result?.mad_analysis || 'No MAD analysis available'}
+                                </pre>
+                                {/* Debug info */}
+                                <div className="text-xs text-gray-500 mt-2">
+                                  Debug: MAD analysis length: {conversionResult.result?.mad_analysis?.length || 0}, 
+                                  Has MAD analysis: {!!conversionResult.result?.mad_analysis}
+                                </div>
                               </div>
                             </div>
                           </div>

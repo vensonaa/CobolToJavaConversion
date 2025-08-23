@@ -31,6 +31,7 @@ spec.loader.exec_module(conversion_module)
 
 from utils.java_file_generator import JavaFileGenerator
 from utils.file_utils import save_conversion_results, create_conversion_report
+from utils.mad_generator import MADGenerator
 
 from contextlib import asynccontextmanager
 
@@ -204,8 +205,16 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
             raise conversion_error
         
         # Update status
-        conversion_results[conversion_id]["message"] = "Generating Java files..."
+        conversion_results[conversion_id]["message"] = "Generating MAD and Java files..."
         conversion_results[conversion_id]["progress"] = 80
+        
+        # Generate MAD (Mainframe Analysis Document)
+        mad_generator = MADGenerator()
+        mad_analysis = mad_generator.generate_mad(request.cobol_code, request.prior_knowledge)
+        
+        # Update status
+        conversion_results[conversion_id]["message"] = "Generating Java files..."
+        conversion_results[conversion_id]["progress"] = 85
         
         # Generate separate Java files if requested
         java_files = []
@@ -242,7 +251,8 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
                 **result,
                 "java_files": java_files,
                 "file_paths": file_paths,
-                "report_path": report_path
+                "report_path": report_path,
+                "mad_analysis": mad_analysis
             }
         })
         
@@ -259,6 +269,7 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
                 conversion_record.java_code = result.get("final_java_code", "")
                 conversion_record.pseudo_code = result.get("pseudo_code", "")
                 conversion_record.summary = result.get("summary", "")
+                conversion_record.mad_analysis = mad_analysis
                 conversion_record.java_files_count = len(java_files)
                 
                 # Debug logging
@@ -646,6 +657,7 @@ async def get_conversion_details(conversion_id: str, db: AsyncSession = Depends(
             conversion_dict["final_java_code"] = conversion.java_code
             conversion_dict["pseudo_code"] = conversion.pseudo_code
             conversion_dict["summary"] = conversion.summary
+            conversion_dict["mad_analysis"] = conversion.mad_analysis
             conversion_dict["total_chunks"] = conversion.total_chunks
             conversion_dict["java_files"] = []  # Empty array for now, can be populated later if needed
             
@@ -678,6 +690,31 @@ async def get_conversion_details(conversion_id: str, db: AsyncSession = Depends(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch conversion details: {str(e)}")
+
+@app.get("/api/conversions/{conversion_id}/mad")
+async def get_mad_analysis(conversion_id: str, db: AsyncSession = Depends(get_session)):
+    """Get MAD (Mainframe Analysis Document) for a specific conversion"""
+    try:
+        query = select(ConversionHistory).where(ConversionHistory.conversion_id == conversion_id)
+        result = await db.execute(query)
+        conversion = result.scalars().first()
+        
+        if not conversion:
+            raise HTTPException(status_code=404, detail="Conversion not found")
+        
+        if not conversion.mad_analysis:
+            raise HTTPException(status_code=404, detail="MAD analysis not available for this conversion")
+        
+        return {
+            "conversion_id": conversion.conversion_id,
+            "mad_analysis": conversion.mad_analysis,
+            "generated_at": conversion.updated_at.isoformat() if conversion.updated_at else None
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch MAD analysis: {str(e)}")
 
 @app.get("/api/debug/conversion/{conversion_id}")
 async def debug_conversion(conversion_id: str, db: AsyncSession = Depends(get_session)):
