@@ -32,17 +32,24 @@ spec.loader.exec_module(conversion_module)
 from utils.java_file_generator import JavaFileGenerator
 from utils.file_utils import save_conversion_results, create_conversion_report
 
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Lifespan context manager for FastAPI."""
+    # Startup
+    await init_database()
+    yield
+    # Shutdown
+    pass
+
 # Initialize FastAPI app
 app = FastAPI(
     title="COBOL to Java Conversion API",
     description="A multi-agent LangGraph system for converting COBOL code to Java",
-    version="2.0.0"
+    version="2.0.0",
+    lifespan=lifespan
 )
-
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on startup"""
-    await init_database()
 
 # Add CORS middleware
 app.add_middleware(
@@ -71,6 +78,12 @@ class ConversionStats(BaseModel):
     successful_conversions: int
     failed_conversions: int
     total_java_files: int
+    total_java_classes: int
+    total_files_uploaded: int
+    total: int
+    completed: int
+    in_progress: int
+    failed: int
 
 class ConversionResponse(BaseModel):
     status: str
@@ -151,6 +164,7 @@ async def convert_cobol(request: ConversionRequest):
             break
         
         # Run conversion asynchronously
+        print(f"🚀 Starting conversion task for {conversion_id}")
         asyncio.create_task(run_conversion(conversion_id, request))
         
         return ConversionResponse(
@@ -167,17 +181,27 @@ async def convert_cobol(request: ConversionRequest):
 async def run_conversion(conversion_id: str, request: ConversionRequest):
     """Run the conversion process asynchronously."""
     try:
+        print(f"🔄 Starting conversion process for {conversion_id}")
         # Update status in memory
         conversion_results[conversion_id]["message"] = "Initializing conversion..."
         conversion_results[conversion_id]["progress"] = 10
         
-
+        # Update status for parallel processing
+        conversion_results[conversion_id]["message"] = "Processing chunks in parallel..."
+        conversion_results[conversion_id]["progress"] = 20
         
         # Run the conversion
-        result = await conversion_module.convert_cobol_to_java(
-            request.cobol_code, 
-            request.prior_knowledge
-        )
+        print(f"🔄 Calling convert_cobol_to_java for {conversion_id}")
+        try:
+            result = await conversion_module.convert_cobol_to_java(
+                request.cobol_code, 
+                request.prior_knowledge
+            )
+            print(f"✅ Conversion completed for {conversion_id}, result keys: {list(result.keys())}")
+        except Exception as conversion_error:
+            print(f"❌ Conversion error for {conversion_id}: {str(conversion_error)}")
+            print(f"❌ Error type: {type(conversion_error)}")
+            raise conversion_error
         
         # Update status
         conversion_results[conversion_id]["message"] = "Generating Java files..."
@@ -186,8 +210,19 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
         # Generate separate Java files if requested
         java_files = []
         if request.generate_separate_files:
+            # Debug: Check what Java code we have
+            java_code = result.get("final_java_code", "")
+            print(f"=== JAVA FILE GENERATION DEBUG ===")
+            print(f"Java code length: {len(java_code)}")
+            print(f"Java code preview: {java_code[:200]}...")
+            print(f"Result keys: {list(result.keys())}")
+            
             generator = JavaFileGenerator(f"output/java/{conversion_id}")
             java_files = generator.generate_java_files(result)
+            
+            print(f"Generated {len(java_files)} Java files")
+            print(f"Java files: {java_files}")
+            print(f"=== END JAVA FILE GENERATION DEBUG ===")
         
         # Save results
         file_paths = save_conversion_results(result, f"conversion_{conversion_id}", "output")
@@ -225,6 +260,10 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
                 conversion_record.pseudo_code = result.get("pseudo_code", "")
                 conversion_record.summary = result.get("summary", "")
                 conversion_record.java_files_count = len(java_files)
+                
+                # Debug logging
+                print(f"Saved to database - Summary length: {len(result.get('summary', ''))}")
+                print(f"Saved to database - Summary preview: {result.get('summary', '')[:100]}...")
                 conversion_record.total_chunks = result.get("total_chunks", 0)
                 conversion_record.updated_at = datetime.utcnow()
                 
@@ -232,6 +271,12 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
             break
         
     except Exception as e:
+        print(f"❌ Exception in run_conversion for {conversion_id}: {str(e)}")
+        print(f"❌ Exception type: {type(e)}")
+        print(f"❌ Exception traceback:")
+        import traceback
+        traceback.print_exc()
+        
         error_message = f"Conversion failed: {str(e)}"
         
         # Update memory status
@@ -261,20 +306,39 @@ async def run_conversion(conversion_id: str, request: ConversionRequest):
             print(f"Failed to update database for failed conversion {conversion_id}: {db_error}")
 
 @app.get("/api/status/{conversion_id}", response_model=ConversionStatus)
-async def get_conversion_status(conversion_id: str):
+async def get_conversion_status(conversion_id: str, db: AsyncSession = Depends(get_session)):
     """Get the status of a conversion."""
-    if conversion_id not in conversion_results:
-        raise HTTPException(status_code=404, detail="Conversion not found")
+    # First check in-memory results
+    if conversion_id in conversion_results:
+        result = conversion_results[conversion_id]
+        return ConversionStatus(
+            conversion_id=conversion_id,
+            status=result["status"],
+            progress=result["progress"],
+            message=result["message"],
+            result=result.get("result")
+        )
     
-    result = conversion_results[conversion_id]
-    
-    return ConversionStatus(
-        conversion_id=conversion_id,
-        status=result["status"],
-        progress=result["progress"],
-        message=result["message"],
-        result=result.get("result")
-    )
+    # If not in memory, check database
+    try:
+        query = select(ConversionHistory).where(ConversionHistory.conversion_id == conversion_id)
+        result_db = await db.execute(query)
+        conversion_record = result_db.scalars().first()
+        
+        if not conversion_record:
+            raise HTTPException(status_code=404, detail="Conversion not found")
+        
+        return ConversionStatus(
+            conversion_id=conversion_id,
+            status=conversion_record.status,
+            progress=conversion_record.progress,
+            message=conversion_record.message,
+            result=None  # Detailed results are fetched separately
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
 @app.get("/api/download/{conversion_id}")
 async def download_conversion_results(conversion_id: str, db: AsyncSession = Depends(get_session)):
@@ -523,6 +587,13 @@ async def get_conversion_stats(db: AsyncSession = Depends(get_session)):
         failed_result = await db.execute(failed_query)
         failed_conversions = failed_result.scalar()
         
+        # In progress conversions
+        in_progress_query = select(func.count(ConversionHistory.id)).where(
+            ConversionHistory.status == "processing"
+        )
+        in_progress_result = await db.execute(in_progress_query)
+        in_progress_conversions = in_progress_result.scalar()
+        
         # Total Java files
         java_files_query = select(func.sum(ConversionHistory.java_files_count)).where(
             ConversionHistory.status == "completed"
@@ -530,11 +601,27 @@ async def get_conversion_stats(db: AsyncSession = Depends(get_session)):
         java_files_result = await db.execute(java_files_query)
         total_java_files = java_files_result.scalar() or 0
         
+        # Total Java classes (estimated from java_files_count)
+        total_java_classes = total_java_files
+        
+        # Total files uploaded (conversions with cobol_code)
+        files_uploaded_query = select(func.count(ConversionHistory.id)).where(
+            ConversionHistory.cobol_code.isnot(None)
+        )
+        files_uploaded_result = await db.execute(files_uploaded_query)
+        total_files_uploaded = files_uploaded_result.scalar()
+        
         return ConversionStats(
             total_conversions=total_conversions,
             successful_conversions=successful_conversions,
             failed_conversions=failed_conversions,
-            total_java_files=total_java_files
+            total_java_files=total_java_files,
+            total_java_classes=total_java_classes,
+            total_files_uploaded=total_files_uploaded,
+            total=total_conversions,
+            completed=successful_conversions,
+            in_progress=in_progress_conversions,
+            failed=failed_conversions
         )
         
     except Exception as e:
@@ -562,10 +649,28 @@ async def get_conversion_details(conversion_id: str, db: AsyncSession = Depends(
             conversion_dict["total_chunks"] = conversion.total_chunks
             conversion_dict["java_files"] = []  # Empty array for now, can be populated later if needed
             
+            # Debug: Print the actual conversion_dict structure
+            print(f"API Response structure for {conversion_id}:")
+            print(f"  - java_code field: {'PRESENT' if 'java_code' in conversion_dict else 'MISSING'}")
+            print(f"  - final_java_code field: {'PRESENT' if 'final_java_code' in conversion_dict else 'MISSING'}")
+            print(f"  - java_code value length: {len(conversion_dict.get('java_code', ''))}")
+            print(f"  - final_java_code value length: {len(conversion_dict.get('final_java_code', ''))}")
+            
             # Debug logging
             print(f"Conversion {conversion_id} - Java code length: {len(conversion.java_code or '')}")
             print(f"Conversion {conversion_id} - Pseudo code length: {len(conversion.pseudo_code or '')}")
             print(f"Conversion {conversion_id} - Summary length: {len(conversion.summary or '')}")
+            print(f"Conversion {conversion_id} - Java code preview: {(conversion.java_code or '')[:100]}...")
+            print(f"Conversion {conversion_id} - final_java_code field: {conversion_dict.get('final_java_code', 'NOT_FOUND')[:100] if conversion_dict.get('final_java_code') else 'NOT_FOUND'}...")
+        
+        # Debug: Log the entire response structure
+        print(f"=== FULL API RESPONSE FOR {conversion_id} ===")
+        for key, value in conversion_dict.items():
+            if key in ['java_code', 'final_java_code', 'pseudo_code', 'summary']:
+                print(f"  {key}: {len(str(value))} chars - Preview: {str(value)[:50]}...")
+            else:
+                print(f"  {key}: {value}")
+        print("=== END API RESPONSE ===")
         
         return conversion_dict
         
@@ -604,4 +709,4 @@ async def debug_conversion(conversion_id: str, db: AsyncSession = Depends(get_se
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

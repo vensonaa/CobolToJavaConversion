@@ -1,0 +1,724 @@
+       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PRODUCT-MANAGEMENT.
+       AUTHOR. ENTERPRISE-DEVELOPER.
+       DATE-WRITTEN. 2024-12-19.
+       
+       ENVIRONMENT DIVISION.
+       INPUT-OUTPUT SECTION.
+       FILE-CONTROL.
+           SELECT PRODUCT-MASTER ASSIGN TO 'products.dat'
+                  ORGANIZATION IS INDEXED
+                  ACCESS MODE IS RANDOM
+                  RECORD KEY IS PRODUCT-ID
+                  ALTERNATE RECORD KEY IS PRODUCT-CODE
+                  FILE STATUS IS WS-PRODUCT-STATUS.
+           
+           SELECT PRODUCT-CATEGORY ASSIGN TO 'categories.dat'
+                  ORGANIZATION IS INDEXED
+                  ACCESS MODE IS RANDOM
+                  RECORD KEY IS CATEGORY-ID
+                  FILE STATUS IS WS-CATEGORY-STATUS.
+           
+           SELECT PRODUCT-SUPPLIER ASSIGN TO 'product_suppliers.dat'
+                  ORGANIZATION IS INDEXED
+                  ACCESS MODE IS RANDOM
+                  RECORD KEY IS PS-KEY
+                  FILE STATUS IS WS-PS-STATUS.
+           
+           SELECT PRODUCT-PRICE-HISTORY ASSIGN TO 'price_history.dat'
+                  ORGANIZATION IS INDEXED
+                  ACCESS MODE IS RANDOM
+                  RECORD KEY IS PH-KEY
+                  FILE STATUS IS WS-PH-STATUS.
+       
+       DATA DIVISION.
+       FILE SECTION.
+       FD  PRODUCT-MASTER.
+       01  PRODUCT-RECORD.
+           05  PRODUCT-ID           PIC 9(8).
+           05  PRODUCT-CODE         PIC X(15).
+           05  PRODUCT-NAME         PIC X(50).
+           05  PRODUCT-DESCRIPTION  PIC X(200).
+           05  PRODUCT-CATEGORY-ID  PIC 9(3).
+           05  PRODUCT-UOM          PIC X(10).
+           05  PRODUCT-SPECIFICATIONS.
+               10  PRODUCT-LENGTH   PIC 9(5)V99.
+               10  PRODUCT-WIDTH    PIC 9(5)V99.
+               10  PRODUCT-HEIGHT   PIC 9(5)V99.
+               10  PRODUCT-WEIGHT   PIC 9(5)V99.
+           05  PRODUCT-PRICING.
+               10  PRODUCT-COST     PIC 9(8)V99.
+               10  PRODUCT-PRICE    PIC 9(8)V99.
+               10  PRODUCT-MARGIN   PIC 9(3)V99.
+           05  PRODUCT-INVENTORY.
+               10  PRODUCT-MIN-STOCK PIC 9(6).
+               10  PRODUCT-MAX-STOCK PIC 9(6).
+               10  PRODUCT-REORDER-PT PIC 9(6).
+               10  PRODUCT-LEAD-TIME PIC 9(3).
+           05  PRODUCT-STATUS       PIC X(1).
+               88  PRODUCT-ACTIVE   VALUE 'A'.
+               88  PRODUCT-INACTIVE VALUE 'I'.
+               88  PRODUCT-DISCONT  VALUE 'D'.
+           05  PRODUCT-DATES.
+               10  PRODUCT-CREATE-DATE PIC 9(8).
+               10  PRODUCT-LAST-UPDATE PIC 9(8).
+               10  PRODUCT-DISCONT-DATE PIC 9(8).
+           05  PRODUCT-ATTRIBUTES.
+               10  PRODUCT-BRAND    PIC X(30).
+               10  PRODUCT-MODEL    PIC X(30).
+               10  PRODUCT-SERIAL   PIC X(20).
+               10  PRODUCT-WARRANTY PIC 9(3).
+           05  PRODUCT-TAX-INFO.
+               10  PRODUCT-TAX-RATE PIC 9(3)V99.
+               10  PRODUCT-TAX-CODE PIC X(5).
+           05  PRODUCT-QUALITY.
+               10  PRODUCT-QUALITY-RATING PIC 9(1).
+               10  PRODUCT-QUALITY-NOTES PIC X(100).
+       
+       FD  PRODUCT-CATEGORY.
+       01  CATEGORY-RECORD.
+           05  CATEGORY-ID          PIC 9(3).
+           05  CATEGORY-NAME        PIC X(30).
+           05  CATEGORY-DESCRIPTION PIC X(100).
+           05  CATEGORY-PARENT-ID   PIC 9(3).
+           05  CATEGORY-LEVEL       PIC 9(1).
+           05  CATEGORY-STATUS      PIC X(1).
+           05  CATEGORY-CREATE-DATE PIC 9(8).
+       
+       FD  PRODUCT-SUPPLIER.
+       01  PS-RECORD.
+           05  PS-KEY.
+               10  PS-PRODUCT-ID    PIC 9(8).
+               10  PS-SUPPLIER-ID   PIC 9(4).
+           05  PS-PREFERRED-SUPPLIER PIC X(1).
+           05  PS-SUPPLIER-COST     PIC 9(8)V99.
+           05  PS-LEAD-TIME         PIC 9(3).
+           05  PS-MIN-ORDER-QTY     PIC 9(6).
+           05  PS-MAX-ORDER-QTY     PIC 9(6).
+           05  PS-SUPPLIER-RATING   PIC 9(1).
+       
+       FD  PRODUCT-PRICE-HISTORY.
+       01  PH-RECORD.
+           05  PH-KEY.
+               10  PH-PRODUCT-ID    PIC 9(8).
+               10  PH-EFFECTIVE-DATE PIC 9(8).
+           05  PH-END-DATE          PIC 9(8).
+           05  PH-COST-PRICE        PIC 9(8)V99.
+           05  PH-SELLING-PRICE     PIC 9(8)V99.
+           05  PH-REASON-CODE       PIC X(2).
+           05  PH-APPROVED-BY       PIC X(20).
+       
+       WORKING-STORAGE SECTION.
+       01  WS-SYSTEM-VARIABLES.
+           05  WS-CURRENT-DATE      PIC 9(8).
+           05  WS-CURRENT-TIME      PIC 9(6).
+           05  WS-USER-ID           PIC X(20).
+           05  WS-PROGRAM-STATUS    PIC X(1).
+           05  WS-TRANSACTION-COUNT PIC 9(6).
+       
+       01  WS-PRODUCT-VARIABLES.
+           05  WS-PRODUCT-ID        PIC 9(8).
+           05  WS-PRODUCT-CODE      PIC X(15).
+           05  WS-PRODUCT-NAME      PIC X(50).
+           05  WS-PRODUCT-FOUND     PIC X(1).
+               88  WS-PRODUCT-EXISTS VALUE 'Y'.
+               88  WS-PRODUCT-NOT-FOUND VALUE 'N'.
+           05  WS-PRODUCT-ACTION    PIC X(1).
+               88  WS-ACTION-ADD     VALUE 'A'.
+               88  WS-ACTION-UPDATE  VALUE 'U'.
+               88  WS-ACTION-DELETE  VALUE 'D'.
+               88  WS-ACTION-VIEW    VALUE 'V'.
+       
+       01  WS-MENU-OPTIONS.
+           05  WS-MENU-CHOICE       PIC 9(1).
+               88  WS-MENU-ADD       VALUE 1.
+               88  WS-MENU-UPDATE    VALUE 2.
+               88  WS-MENU-DELETE    VALUE 3.
+               88  WS-MENU-VIEW      VALUE 4.
+               88  WS-MENU-SEARCH    VALUE 5.
+               88  WS-MENU-REPORTS   VALUE 6.
+               88  WS-MENU-EXIT      VALUE 0.
+       
+       01  WS-FILE-STATUS-VARIABLES.
+           05  WS-PRODUCT-STATUS    PIC X(2).
+           05  WS-CATEGORY-STATUS   PIC X(2).
+           05  WS-PS-STATUS         PIC X(2).
+           05  WS-PH-STATUS         PIC X(2).
+       
+       01  WS-ERROR-HANDLING.
+           05  WS-ERROR-CODE        PIC X(4).
+           05  WS-ERROR-MESSAGE     PIC X(100).
+           05  WS-ERROR-SEVERITY    PIC X(1).
+       
+       01  WS-VALIDATION-RESULTS.
+           05  WS-VALIDATION-STATUS PIC X(1).
+               88  WS-VALIDATION-OK  VALUE 'Y'.
+               88  WS-VALIDATION-ERROR VALUE 'N'.
+           05  WS-VALIDATION-ERRORS PIC X(200).
+       
+       PROCEDURE DIVISION.
+       
+       0000-MAIN-PROCEDURE.
+           PERFORM 1000-INITIALIZATION
+           PERFORM 2000-MAIN-MENU-LOOP
+           PERFORM 9000-CLEANUP
+           EXIT PROGRAM.
+       
+       1000-INITIALIZATION.
+           MOVE FUNCTION CURRENT-DATE TO WS-CURRENT-DATE
+           MOVE FUNCTION CURRENT-TIME TO WS-CURRENT-TIME
+           PERFORM 1100-OPEN-FILES
+           PERFORM 1200-INITIALIZE-VARIABLES
+           PERFORM 1300-DISPLAY-BANNER.
+       
+       1100-OPEN-FILES.
+           OPEN I-O PRODUCT-MASTER
+           IF WS-PRODUCT-STATUS NOT = '00' AND '05'
+               PERFORM 9999-FATAL-ERROR
+           END-IF
+           OPEN INPUT PRODUCT-CATEGORY
+           IF WS-CATEGORY-STATUS NOT = '00'
+               PERFORM 9999-FATAL-ERROR
+           END-IF
+           OPEN I-O PRODUCT-SUPPLIER
+           IF WS-PS-STATUS NOT = '00' AND '05'
+               PERFORM 9999-FATAL-ERROR
+           END-IF
+           OPEN I-O PRODUCT-PRICE-HISTORY
+           IF WS-PH-STATUS NOT = '00' AND '05'
+               PERFORM 9999-FATAL-ERROR
+           END-IF.
+       
+       1200-INITIALIZE-VARIABLES.
+           MOVE 'N' TO WS-PROGRAM-STATUS
+           MOVE 0 TO WS-TRANSACTION-COUNT
+           MOVE SPACES TO WS-USER-ID
+           MOVE 'N' TO WS-PRODUCT-FOUND.
+       
+       1300-DISPLAY-BANNER.
+           DISPLAY '========================================'
+           DISPLAY '         PRODUCT MANAGEMENT SYSTEM'
+           DISPLAY '========================================'
+           DISPLAY SPACE.
+       
+       2000-MAIN-MENU-LOOP.
+           PERFORM 2100-DISPLAY-MENU
+           PERFORM 2200-GET-MENU-CHOICE
+           PERFORM 2300-PROCESS-MENU-CHOICE
+           UNTIL WS-MENU-EXIT.
+       
+       2100-DISPLAY-MENU.
+           DISPLAY SPACE
+           DISPLAY 'PRODUCT MANAGEMENT MENU:'
+           DISPLAY '1. ADD NEW PRODUCT'
+           DISPLAY '2. UPDATE PRODUCT'
+           DISPLAY '3. DELETE PRODUCT'
+           DISPLAY '4. VIEW PRODUCT'
+           DISPLAY '5. SEARCH PRODUCTS'
+           DISPLAY '6. PRODUCT REPORTS'
+           DISPLAY '0. EXIT TO MAIN MENU'
+           DISPLAY SPACE.
+       
+       2200-GET-MENU-CHOICE.
+           DISPLAY 'ENTER YOUR CHOICE (0-6): '
+           ACCEPT WS-MENU-CHOICE.
+       
+       2300-PROCESS-MENU-CHOICE.
+           EVALUATE WS-MENU-CHOICE
+               WHEN 1 PERFORM 3000-ADD-PRODUCT
+               WHEN 2 PERFORM 4000-UPDATE-PRODUCT
+               WHEN 3 PERFORM 5000-DELETE-PRODUCT
+               WHEN 4 PERFORM 6000-VIEW-PRODUCT
+               WHEN 5 PERFORM 7000-SEARCH-PRODUCTS
+               WHEN 6 PERFORM 8000-PRODUCT-REPORTS
+               WHEN 0 PERFORM 8900-EXIT-MENU
+               WHEN OTHER PERFORM 8950-INVALID-CHOICE
+           END-EVALUATE.
+       
+       3000-ADD-PRODUCT.
+           PERFORM 3100-GET-PRODUCT-DATA
+           PERFORM 3200-VALIDATE-PRODUCT-DATA
+           IF WS-VALIDATION-OK
+               PERFORM 3300-SAVE-PRODUCT
+               PERFORM 3400-UPDATE-PRICE-HISTORY
+               PERFORM 3500-UPDATE-SUPPLIER-INFO
+               PERFORM 3600-DISPLAY-SUCCESS-MESSAGE
+           ELSE
+               PERFORM 3700-DISPLAY-VALIDATION-ERRORS
+           END-IF.
+       
+       3100-GET-PRODUCT-DATA.
+           DISPLAY 'ENTER PRODUCT INFORMATION:'
+           DISPLAY 'PRODUCT CODE: '
+           ACCEPT WS-PRODUCT-CODE
+           DISPLAY 'PRODUCT NAME: '
+           ACCEPT WS-PRODUCT-NAME
+           DISPLAY 'PRODUCT DESCRIPTION: '
+           ACCEPT PRODUCT-DESCRIPTION
+           DISPLAY 'CATEGORY ID: '
+           ACCEPT PRODUCT-CATEGORY-ID
+           DISPLAY 'UNIT OF MEASURE: '
+           ACCEPT PRODUCT-UOM
+           DISPLAY 'COST PRICE: '
+           ACCEPT PRODUCT-COST
+           DISPLAY 'SELLING PRICE: '
+           ACCEPT PRODUCT-PRICE
+           DISPLAY 'MINIMUM STOCK: '
+           ACCEPT PRODUCT-MIN-STOCK
+           DISPLAY 'MAXIMUM STOCK: '
+           ACCEPT PRODUCT-MAX-STOCK
+           DISPLAY 'REORDER POINT: '
+           ACCEPT PRODUCT-REORDER-PT
+           DISPLAY 'LEAD TIME (DAYS): '
+           ACCEPT PRODUCT-LEAD-TIME
+           DISPLAY 'BRAND: '
+           ACCEPT PRODUCT-BRAND
+           DISPLAY 'MODEL: '
+           ACCEPT PRODUCT-MODEL
+           DISPLAY 'TAX RATE (%): '
+           ACCEPT PRODUCT-TAX-RATE.
+       
+       3200-VALIDATE-PRODUCT-DATA.
+           MOVE 'Y' TO WS-VALIDATION-STATUS
+           MOVE SPACES TO WS-VALIDATION-ERRORS
+           
+           IF WS-PRODUCT-CODE = SPACES
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'PRODUCT CODE IS REQUIRED' TO WS-VALIDATION-ERRORS
+           END-IF
+           
+           IF WS-PRODUCT-NAME = SPACES
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'PRODUCT NAME IS REQUIRED' TO WS-VALIDATION-ERRORS
+           END-IF
+           
+           IF PRODUCT-COST <= 0
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'COST PRICE MUST BE GREATER THAN ZERO' TO WS-VALIDATION-ERRORS
+           END-IF
+           
+           IF PRODUCT-PRICE <= PRODUCT-COST
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'SELLING PRICE MUST BE GREATER THAN COST' TO WS-VALIDATION-ERRORS
+           END-IF
+           
+           PERFORM 3210-CHECK-PRODUCT-EXISTS
+           IF WS-PRODUCT-EXISTS
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'PRODUCT CODE ALREADY EXISTS' TO WS-VALIDATION-ERRORS
+           END-IF.
+       
+       3210-CHECK-PRODUCT-EXISTS.
+           MOVE WS-PRODUCT-CODE TO PRODUCT-CODE
+           READ PRODUCT-MASTER
+           IF WS-PRODUCT-STATUS = '00'
+               MOVE 'Y' TO WS-PRODUCT-FOUND
+           ELSE
+               MOVE 'N' TO WS-PRODUCT-FOUND
+           END-IF.
+       
+       3300-SAVE-PRODUCT.
+           PERFORM 3310-GENERATE-PRODUCT-ID
+           PERFORM 3320-SET-PRODUCT-DEFAULTS
+           PERFORM 3330-WRITE-PRODUCT-RECORD
+           ADD 1 TO WS-TRANSACTION-COUNT.
+       
+       3310-GENERATE-PRODUCT-ID.
+           MOVE FUNCTION CURRENT-DATE TO WS-CURRENT-DATE
+           MOVE FUNCTION CURRENT-TIME TO WS-CURRENT-TIME
+           COMPUTE WS-PRODUCT-ID = FUNCTION RANDOM * 99999999
+           MOVE WS-PRODUCT-ID TO PRODUCT-ID.
+       
+       3320-SET-PRODUCT-DEFAULTS.
+           MOVE WS-CURRENT-DATE TO PRODUCT-CREATE-DATE
+           MOVE WS-CURRENT-DATE TO PRODUCT-LAST-UPDATE
+           MOVE 'A' TO PRODUCT-STATUS
+           MOVE 0 TO PRODUCT-DISCONT-DATE
+           COMPUTE PRODUCT-MARGIN = ((PRODUCT-PRICE - PRODUCT-COST) / PRODUCT-COST) * 100.
+       
+       3330-WRITE-PRODUCT-RECORD.
+           WRITE PRODUCT-RECORD
+           IF WS-PRODUCT-STATUS NOT = '00'
+               PERFORM 9998-LOG-ERROR
+           END-IF.
+       
+       3400-UPDATE-PRICE-HISTORY.
+           MOVE PRODUCT-ID TO PH-PRODUCT-ID
+           MOVE WS-CURRENT-DATE TO PH-EFFECTIVE-DATE
+           MOVE 99991231 TO PH-END-DATE
+           MOVE PRODUCT-COST TO PH-COST-PRICE
+           MOVE PRODUCT-PRICE TO PH-SELLING-PRICE
+           MOVE 'IN' TO PH-REASON-CODE
+           MOVE WS-USER-ID TO PH-APPROVED-BY
+           WRITE PH-RECORD
+           IF WS-PH-STATUS NOT = '00'
+               PERFORM 9998-LOG-ERROR
+           END-IF.
+       
+       3500-UPDATE-SUPPLIER-INFO.
+           DISPLAY 'ENTER PRIMARY SUPPLIER ID (0 TO SKIP): '
+           ACCEPT WS-SUPPLIER-ID
+           IF WS-SUPPLIER-ID > 0
+               MOVE PRODUCT-ID TO PS-PRODUCT-ID
+               MOVE WS-SUPPLIER-ID TO PS-SUPPLIER-ID
+               MOVE 'Y' TO PS-PREFERRED-SUPPLIER
+               MOVE PRODUCT-COST TO PS-SUPPLIER-COST
+               MOVE PRODUCT-LEAD-TIME TO PS-LEAD-TIME
+               MOVE 1 TO PS-MIN-ORDER-QTY
+               MOVE 999999 TO PS-MAX-ORDER-QTY
+               MOVE 5 TO PS-SUPPLIER-RATING
+               WRITE PS-RECORD
+               IF WS-PS-STATUS NOT = '00'
+                   PERFORM 9998-LOG-ERROR
+               END-IF
+           END-IF.
+       
+       3600-DISPLAY-SUCCESS-MESSAGE.
+           DISPLAY 'PRODUCT ADDED SUCCESSFULLY'
+           DISPLAY 'PRODUCT ID: ' PRODUCT-ID
+           DISPLAY 'PRODUCT CODE: ' PRODUCT-CODE.
+       
+       3700-DISPLAY-VALIDATION-ERRORS.
+           DISPLAY 'VALIDATION ERRORS:'
+           DISPLAY WS-VALIDATION-ERRORS.
+       
+       4000-UPDATE-PRODUCT.
+           PERFORM 4100-GET-PRODUCT-TO-UPDATE
+           IF WS-PRODUCT-EXISTS
+               PERFORM 4200-GET-UPDATE-DATA
+               PERFORM 4300-VALIDATE-UPDATE-DATA
+               IF WS-VALIDATION-OK
+                   PERFORM 4400-SAVE-UPDATED-PRODUCT
+                   PERFORM 4500-UPDATE-PRICE-HISTORY-IF-NEEDED
+                   PERFORM 4600-DISPLAY-UPDATE-SUCCESS
+               ELSE
+                   PERFORM 4700-DISPLAY-UPDATE-ERRORS
+               END-IF
+           ELSE
+               PERFORM 4800-DISPLAY-PRODUCT-NOT-FOUND
+           END-IF.
+       
+       4100-GET-PRODUCT-TO-UPDATE.
+           DISPLAY 'ENTER PRODUCT CODE TO UPDATE: '
+           ACCEPT WS-PRODUCT-CODE
+           MOVE WS-PRODUCT-CODE TO PRODUCT-CODE
+           READ PRODUCT-MASTER
+           IF WS-PRODUCT-STATUS = '00'
+               MOVE 'Y' TO WS-PRODUCT-FOUND
+           ELSE
+               MOVE 'N' TO WS-PRODUCT-FOUND
+           END-IF.
+       
+       4200-GET-UPDATE-DATA.
+           DISPLAY 'CURRENT PRODUCT INFORMATION:'
+           DISPLAY 'NAME: ' PRODUCT-NAME
+           DISPLAY 'DESCRIPTION: ' PRODUCT-DESCRIPTION
+           DISPLAY 'COST: ' PRODUCT-COST
+           DISPLAY 'PRICE: ' PRODUCT-PRICE
+           DISPLAY SPACE
+           DISPLAY 'ENTER NEW VALUES (PRESS ENTER TO KEEP CURRENT):'
+           DISPLAY 'NEW NAME: '
+           ACCEPT WS-NEW-NAME
+           IF WS-NEW-NAME NOT = SPACES
+               MOVE WS-NEW-NAME TO PRODUCT-NAME
+           END-IF
+           DISPLAY 'NEW DESCRIPTION: '
+           ACCEPT WS-NEW-DESCRIPTION
+           IF WS-NEW-DESCRIPTION NOT = SPACES
+               MOVE WS-NEW-DESCRIPTION TO PRODUCT-DESCRIPTION
+           END-IF
+           DISPLAY 'NEW COST: '
+           ACCEPT WS-NEW-COST
+           IF WS-NEW-COST > 0
+               MOVE WS-NEW-COST TO PRODUCT-COST
+           END-IF
+           DISPLAY 'NEW PRICE: '
+           ACCEPT WS-NEW-PRICE
+           IF WS-NEW-PRICE > 0
+               MOVE WS-NEW-PRICE TO PRODUCT-PRICE
+           END-IF.
+       
+       4300-VALIDATE-UPDATE-DATA.
+           MOVE 'Y' TO WS-VALIDATION-STATUS
+           IF PRODUCT-PRICE <= PRODUCT-COST
+               MOVE 'N' TO WS-VALIDATION-STATUS
+               MOVE 'SELLING PRICE MUST BE GREATER THAN COST' TO WS-VALIDATION-ERRORS
+           END-IF.
+       
+       4400-SAVE-UPDATED-PRODUCT.
+           MOVE WS-CURRENT-DATE TO PRODUCT-LAST-UPDATE
+           COMPUTE PRODUCT-MARGIN = ((PRODUCT-PRICE - PRODUCT-COST) / PRODUCT-COST) * 100
+           REWRITE PRODUCT-RECORD
+           IF WS-PRODUCT-STATUS NOT = '00'
+               PERFORM 9998-LOG-ERROR
+           END-IF
+           ADD 1 TO WS-TRANSACTION-COUNT.
+       
+       4500-UPDATE-PRICE-HISTORY-IF-NEEDED.
+           IF WS-PRICE-CHANGED
+               PERFORM 3400-UPDATE-PRICE-HISTORY
+           END-IF.
+       
+       4600-DISPLAY-UPDATE-SUCCESS.
+           DISPLAY 'PRODUCT UPDATED SUCCESSFULLY'.
+       
+       4700-DISPLAY-UPDATE-ERRORS.
+           DISPLAY 'UPDATE ERRORS:'
+           DISPLAY WS-VALIDATION-ERRORS.
+       
+       4800-DISPLAY-PRODUCT-NOT-FOUND.
+           DISPLAY 'PRODUCT NOT FOUND'.
+       
+       5000-DELETE-PRODUCT.
+           PERFORM 5100-GET-PRODUCT-TO-DELETE
+           IF WS-PRODUCT-EXISTS
+               PERFORM 5200-CONFIRM-DELETION
+               IF WS-CONFIRM-DELETE
+                   PERFORM 5300-PERFORM-DELETION
+                   PERFORM 5400-DISPLAY-DELETE-SUCCESS
+               ELSE
+                   PERFORM 5500-DISPLAY-DELETE-CANCELLED
+               END-IF
+           ELSE
+               PERFORM 4800-DISPLAY-PRODUCT-NOT-FOUND
+           END-IF.
+       
+       5100-GET-PRODUCT-TO-DELETE.
+           DISPLAY 'ENTER PRODUCT CODE TO DELETE: '
+           ACCEPT WS-PRODUCT-CODE
+           MOVE WS-PRODUCT-CODE TO PRODUCT-CODE
+           READ PRODUCT-MASTER
+           IF WS-PRODUCT-STATUS = '00'
+               MOVE 'Y' TO WS-PRODUCT-FOUND
+           ELSE
+               MOVE 'N' TO WS-PRODUCT-FOUND
+           END-IF.
+       
+       5200-CONFIRM-DELETION.
+           DISPLAY 'ARE YOU SURE YOU WANT TO DELETE THIS PRODUCT?'
+           DISPLAY 'PRODUCT: ' PRODUCT-NAME
+           DISPLAY 'ENTER Y TO CONFIRM, N TO CANCEL: '
+           ACCEPT WS-CONFIRM-DELETE.
+       
+       5300-PERFORM-DELETION.
+           MOVE 'D' TO PRODUCT-STATUS
+           MOVE WS-CURRENT-DATE TO PRODUCT-DISCONT-DATE
+           REWRITE PRODUCT-RECORD
+           IF WS-PRODUCT-STATUS NOT = '00'
+               PERFORM 9998-LOG-ERROR
+           END-IF
+           ADD 1 TO WS-TRANSACTION-COUNT.
+       
+       5400-DISPLAY-DELETE-SUCCESS.
+           DISPLAY 'PRODUCT DELETED SUCCESSFULLY'.
+       
+       5500-DISPLAY-DELETE-CANCELLED.
+           DISPLAY 'PRODUCT DELETION CANCELLED'.
+       
+       6000-VIEW-PRODUCT.
+           PERFORM 6100-GET-PRODUCT-TO-VIEW
+           IF WS-PRODUCT-EXISTS
+               PERFORM 6200-DISPLAY-PRODUCT-DETAILS
+           ELSE
+               PERFORM 4800-DISPLAY-PRODUCT-NOT-FOUND
+           END-IF.
+       
+       6100-GET-PRODUCT-TO-VIEW.
+           DISPLAY 'ENTER PRODUCT CODE TO VIEW: '
+           ACCEPT WS-PRODUCT-CODE
+           MOVE WS-PRODUCT-CODE TO PRODUCT-CODE
+           READ PRODUCT-MASTER
+           IF WS-PRODUCT-STATUS = '00'
+               MOVE 'Y' TO WS-PRODUCT-FOUND
+           ELSE
+               MOVE 'N' TO WS-PRODUCT-FOUND
+           END-IF.
+       
+       6200-DISPLAY-PRODUCT-DETAILS.
+           DISPLAY '========================================'
+           DISPLAY '           PRODUCT DETAILS'
+           DISPLAY '========================================'
+           DISPLAY 'PRODUCT ID: ' PRODUCT-ID
+           DISPLAY 'PRODUCT CODE: ' PRODUCT-CODE
+           DISPLAY 'PRODUCT NAME: ' PRODUCT-NAME
+           DISPLAY 'DESCRIPTION: ' PRODUCT-DESCRIPTION
+           DISPLAY 'CATEGORY ID: ' PRODUCT-CATEGORY-ID
+           DISPLAY 'UNIT OF MEASURE: ' PRODUCT-UOM
+           DISPLAY 'COST PRICE: $' PRODUCT-COST
+           DISPLAY 'SELLING PRICE: $' PRODUCT-PRICE
+           DISPLAY 'MARGIN: ' PRODUCT-MARGIN '%'
+           DISPLAY 'MIN STOCK: ' PRODUCT-MIN-STOCK
+           DISPLAY 'MAX STOCK: ' PRODUCT-MAX-STOCK
+           DISPLAY 'REORDER POINT: ' PRODUCT-REORDER-PT
+           DISPLAY 'LEAD TIME: ' PRODUCT-LEAD-TIME ' DAYS'
+           DISPLAY 'BRAND: ' PRODUCT-BRAND
+           DISPLAY 'MODEL: ' PRODUCT-MODEL
+           DISPLAY 'STATUS: ' PRODUCT-STATUS
+           DISPLAY 'CREATE DATE: ' PRODUCT-CREATE-DATE
+           DISPLAY 'LAST UPDATE: ' PRODUCT-LAST-UPDATE
+           DISPLAY '========================================'.
+       
+       7000-SEARCH-PRODUCTS.
+           PERFORM 7100-DISPLAY-SEARCH-OPTIONS
+           PERFORM 7200-GET-SEARCH-CRITERIA
+           PERFORM 7300-PERFORM-SEARCH
+           PERFORM 7400-DISPLAY-SEARCH-RESULTS.
+       
+       7100-DISPLAY-SEARCH-OPTIONS.
+           DISPLAY 'SEARCH OPTIONS:'
+           DISPLAY '1. BY PRODUCT CODE'
+           DISPLAY '2. BY PRODUCT NAME'
+           DISPLAY '3. BY CATEGORY'
+           DISPLAY '4. BY BRAND'
+           DISPLAY '5. BY STATUS'.
+       
+       7200-GET-SEARCH-CRITERIA.
+           DISPLAY 'ENTER SEARCH OPTION (1-5): '
+           ACCEPT WS-SEARCH-OPTION
+           DISPLAY 'ENTER SEARCH VALUE: '
+           ACCEPT WS-SEARCH-VALUE.
+       
+       7300-PERFORM-SEARCH.
+           MOVE 0 TO WS-SEARCH-COUNT
+           START PRODUCT-MASTER KEY IS GREATER THAN '00000000'
+           IF WS-PRODUCT-STATUS = '00'
+               PERFORM 7310-READ-PRODUCTS
+           END-IF.
+       
+       7310-READ-PRODUCTS.
+           READ PRODUCT-MASTER NEXT RECORD
+           AT END
+               CONTINUE
+           NOT AT END
+               PERFORM 7320-CHECK-SEARCH-CRITERIA
+               IF WS-MATCH-FOUND
+                   PERFORM 7330-DISPLAY-PRODUCT-SUMMARY
+               END-IF
+               GO TO 7310-READ-PRODUCTS
+           END-READ.
+       
+       7320-CHECK-SEARCH-CRITERIA.
+           MOVE 'N' TO WS-MATCH-FOUND
+           EVALUATE WS-SEARCH-OPTION
+               WHEN 1
+                   IF PRODUCT-CODE = WS-SEARCH-VALUE
+                       MOVE 'Y' TO WS-MATCH-FOUND
+                   END-IF
+               WHEN 2
+                   IF PRODUCT-NAME CONTAINS WS-SEARCH-VALUE
+                       MOVE 'Y' TO WS-MATCH-FOUND
+                   END-IF
+               WHEN 3
+                   IF PRODUCT-CATEGORY-ID = WS-SEARCH-VALUE
+                       MOVE 'Y' TO WS-MATCH-FOUND
+                   END-IF
+               WHEN 4
+                   IF PRODUCT-BRAND = WS-SEARCH-VALUE
+                       MOVE 'Y' TO WS-MATCH-FOUND
+                   END-IF
+               WHEN 5
+                   IF PRODUCT-STATUS = WS-SEARCH-VALUE
+                       MOVE 'Y' TO WS-MATCH-FOUND
+                   END-IF
+           END-EVALUATE.
+       
+       7330-DISPLAY-PRODUCT-SUMMARY.
+           ADD 1 TO WS-SEARCH-COUNT
+           DISPLAY WS-SEARCH-COUNT ': ' PRODUCT-CODE ' - ' PRODUCT-NAME.
+       
+       7400-DISPLAY-SEARCH-RESULTS.
+           DISPLAY 'SEARCH COMPLETED. FOUND ' WS-SEARCH-COUNT ' PRODUCTS.'.
+       
+       8000-PRODUCT-REPORTS.
+           PERFORM 8100-DISPLAY-REPORT-OPTIONS
+           PERFORM 8200-GET-REPORT-CHOICE
+           PERFORM 8300-GENERATE-REPORT.
+       
+       8100-DISPLAY-REPORT-OPTIONS.
+           DISPLAY 'PRODUCT REPORTS:'
+           DISPLAY '1. PRODUCT LISTING'
+           DISPLAY '2. PRODUCT BY CATEGORY'
+           DISPLAY '3. PRODUCT BY STATUS'
+           DISPLAY '4. PRODUCT PRICING REPORT'
+           DISPLAY '5. PRODUCT INVENTORY REPORT'.
+       
+       8200-GET-REPORT-CHOICE.
+           DISPLAY 'ENTER REPORT CHOICE (1-5): '
+           ACCEPT WS-REPORT-CHOICE.
+       
+       8300-GENERATE-REPORT.
+           EVALUATE WS-REPORT-CHOICE
+               WHEN 1 PERFORM 8310-PRODUCT-LISTING-REPORT
+               WHEN 2 PERFORM 8320-PRODUCT-BY-CATEGORY-REPORT
+               WHEN 3 PERFORM 8330-PRODUCT-BY-STATUS-REPORT
+               WHEN 4 PERFORM 8340-PRODUCT-PRICING-REPORT
+               WHEN 5 PERFORM 8350-PRODUCT-INVENTORY-REPORT
+               WHEN OTHER PERFORM 8360-INVALID-REPORT-CHOICE
+           END-EVALUATE.
+       
+       8310-PRODUCT-LISTING-REPORT.
+           DISPLAY '========================================'
+           DISPLAY '           PRODUCT LISTING REPORT'
+           DISPLAY '========================================'
+           DISPLAY 'CODE        NAME                    STATUS'
+           DISPLAY '----------------------------------------'
+           MOVE 0 TO WS-REPORT-COUNT
+           START PRODUCT-MASTER KEY IS GREATER THAN '00000000'
+           IF WS-PRODUCT-STATUS = '00'
+               PERFORM 8311-READ-PRODUCTS-FOR-LISTING
+           END-IF
+           DISPLAY '----------------------------------------'
+           DISPLAY 'TOTAL PRODUCTS: ' WS-REPORT-COUNT.
+       
+       8311-READ-PRODUCTS-FOR-LISTING.
+           READ PRODUCT-MASTER NEXT RECORD
+           AT END
+               CONTINUE
+           NOT AT END
+               ADD 1 TO WS-REPORT-COUNT
+               DISPLAY PRODUCT-CODE ' ' PRODUCT-NAME ' ' PRODUCT-STATUS
+               GO TO 8311-READ-PRODUCTS-FOR-LISTING
+           END-READ.
+       
+       8320-PRODUCT-BY-CATEGORY-REPORT.
+           DISPLAY 'PRODUCT BY CATEGORY REPORT - NOT IMPLEMENTED'.
+       
+       8330-PRODUCT-BY-STATUS-REPORT.
+           DISPLAY 'PRODUCT BY STATUS REPORT - NOT IMPLEMENTED'.
+       
+       8340-PRODUCT-PRICING-REPORT.
+           DISPLAY 'PRODUCT PRICING REPORT - NOT IMPLEMENTED'.
+       
+       8350-PRODUCT-INVENTORY-REPORT.
+           DISPLAY 'PRODUCT INVENTORY REPORT - NOT IMPLEMENTED'.
+       
+       8360-INVALID-REPORT-CHOICE.
+           DISPLAY 'INVALID REPORT CHOICE'.
+       
+       8900-EXIT-MENU.
+           DISPLAY 'RETURNING TO MAIN MENU...'.
+       
+       8950-INVALID-CHOICE.
+           DISPLAY 'INVALID CHOICE - PLEASE SELECT 0-6'.
+       
+       9000-CLEANUP.
+           PERFORM 9100-CLOSE-FILES
+           PERFORM 9200-DISPLAY-STATISTICS.
+       
+       9100-CLOSE-FILES.
+           CLOSE PRODUCT-MASTER
+           CLOSE PRODUCT-CATEGORY
+           CLOSE PRODUCT-SUPPLIER
+           CLOSE PRODUCT-PRICE-HISTORY.
+       
+       9200-DISPLAY-STATISTICS.
+           DISPLAY 'TRANSACTIONS PROCESSED: ' WS-TRANSACTION-COUNT.
+       
+       9998-LOG-ERROR.
+           DISPLAY 'ERROR: ' WS-ERROR-MESSAGE.
+       
+       9999-FATAL-ERROR.
+           DISPLAY 'FATAL ERROR - PROGRAM TERMINATING'
+           PERFORM 9000-CLEANUP
+           EXIT PROGRAM.
+

@@ -34,9 +34,15 @@ class ConversionState(TypedDict):
     chunk_results: List[Dict[str, Any]]
 
 # Initialize the LLM
+model_name = os.getenv("GROQ_MODEL", "llama3-70b-8192")
+temperature = float(os.getenv("GROQ_TEMPERATURE", "0.1"))
+
+print(f"🤖 Using model: {model_name}")
+print(f"🌡️  Temperature: {temperature}")
+
 llm = ChatGroq(
-    model_name="llama3-70b-8192",
-    temperature=0.1,
+    model_name=model_name,
+    temperature=temperature,
     api_key=os.getenv("GROQ_API_KEY")
 )
 
@@ -87,36 +93,43 @@ class PlannerAgent:
     def plan_conversion(self, state: ConversionState) -> ConversionState:
         """Create a conversion plan based on COBOL code and prior knowledge."""
         
-        # If we have chunks, work with the first chunk for planning
-        cobol_code = state['chunks'][0] if state['chunks'] else state['cobol_code']
-        
-        prompt = f"""
-        You are a COBOL to Java conversion planner. Based on the provided COBOL code and prior knowledge, 
-        create a detailed conversion plan.
-        
-        COBOL Code (Chunk 1 of {state['total_chunks']}):
-        {cobol_code[:4000]}...
-        
-        Prior Knowledge:
-        {state['prior_knowledge']}
-        
-        Create a comprehensive plan that includes:
-        1. Analysis of the COBOL structure
-        2. Key conversion challenges
-        3. Required Java patterns and libraries
-        4. Step-by-step conversion approach
-        5. How to handle multiple chunks if present
-        
-        Return your plan as a structured response.
-        """
-        
-        response = self.llm.invoke([HumanMessage(content=prompt)])
-        
-        # Update state with plan
-        state['summary'] = f"Conversion Plan Created:\n{response.content}"
-        state['current_step'] = 'planning_complete'
-        
-        return state
+        try:
+            # If we have chunks, work with the first chunk for planning
+            cobol_code = state['chunks'][0] if state['chunks'] and len(state['chunks']) > 0 else state['cobol_code']
+            
+            prompt = f"""
+            You are a COBOL to Java conversion planner. Based on the provided COBOL code and prior knowledge, 
+            create a detailed conversion plan.
+            
+            COBOL Code (Chunk 1 of {state['total_chunks']}):
+            {cobol_code[:4000]}...
+            
+            Prior Knowledge:
+            {state['prior_knowledge']}
+            
+            Create a comprehensive plan that includes:
+            1. Analysis of the COBOL structure
+            2. Key conversion challenges
+            3. Required Java patterns and libraries
+            4. Step-by-step conversion approach
+            5. How to handle multiple chunks if present
+            
+            Return your plan as a structured response.
+            """
+            
+            response = self.llm.invoke([HumanMessage(content=prompt)])
+            
+            # Update state with plan
+            state['summary'] = f"Conversion Plan Created:\n{response.content}"
+            state['current_step'] = 'planning_complete'
+            
+            return state
+        except Exception as e:
+            print(f"❌ Error in planner agent: {str(e)}")
+            # Set a basic summary to prevent the 'summary' key error
+            state['summary'] = f"Basic conversion plan: Convert COBOL code to Java with error handling. Error in planning: {str(e)}"
+            state['current_step'] = 'planning_complete'
+            return state
 
 class ExecutorAgent:
     """Executor agent that orchestrates the conversion process."""
@@ -136,7 +149,7 @@ class ExecutorAgent:
         Current State:
         - COBOL Code: {cobol_preview}...
         - Total Chunks: {state['total_chunks']}
-        - Plan: {state['summary'][:500]}...
+        - Plan: {state.get('summary', 'No plan available')[:500]}...
         
         Proceed with the conversion workflow:
         1. Delegate to Pseudo Code Generator
@@ -152,7 +165,7 @@ class ExecutorAgent:
         response = self.llm.invoke([HumanMessage(content=prompt)])
         
         state['current_step'] = 'execution_started'
-        state['summary'] += f"\n\nExecution Started:\n{response.content}"
+        state['summary'] = state.get('summary', '') + f"\n\nExecution Started:\n{response.content}"
         
         return state
 
@@ -188,7 +201,7 @@ class PseudoCodeGeneratorAgent:
         
         state['pseudo_code'] = response.content
         state['current_step'] = 'pseudo_code_generated'
-        state['summary'] += f"\n\nPseudo Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
+        state['summary'] = state.get('summary', '') + f"\n\nPseudo Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -229,7 +242,7 @@ class JavaCodeGeneratorAgent:
         
         state['java_code'] = response.content
         state['current_step'] = 'java_code_generated'
-        state['summary'] += f"\n\nJava Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
+        state['summary'] = state.get('summary', '') + f"\n\nJava Code Generated (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -277,7 +290,7 @@ class CodeReviewerAgent:
             state['review_comments'] = [response.content]
             state['current_step'] = 'review_failed'
         
-        state['summary'] += f"\n\nCode Review (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
+        state['summary'] = state.get('summary', '') + f"\n\nCode Review (Chunk {state['current_chunk'] + 1}):\n{response.content[:200]}..."
         
         return state
 
@@ -320,7 +333,7 @@ class CodeFixerAgent:
         state['fixed_java_code'] = response.content
         state['current_step'] = 'code_fixed'
         state['iteration_count'] += 1
-        state['summary'] += f"\n\nCode Fixed (Chunk {state['current_chunk'] + 1}, Iteration {state['iteration_count']}):\n{response.content[:200]}..."
+        state['summary'] = state.get('summary', '') + f"\n\nCode Fixed (Chunk {state['current_chunk'] + 1}, Iteration {state['iteration_count']}):\n{response.content[:200]}..."
         
         return state
 
@@ -362,7 +375,7 @@ class FinalSummarizerAgent:
         
         response = self.llm.invoke([HumanMessage(content=prompt)])
         
-        state['summary'] = response.content
+        state['summary'] = state.get('summary', '') + response.content
         state['current_step'] = 'conversion_complete'
         
         return state
@@ -477,50 +490,172 @@ async def convert_cobol_to_java(cobol_code: str, prior_knowledge: str = "") -> D
     # Create and run the graph
     graph = create_conversion_graph()
     
+    import time
+    start_time = time.time()
+    
     print("🚀 Starting COBOL to Java conversion...")
     print(f"📝 COBOL Code Length: {len(cobol_code)} characters")
     print(f"📦 Processing {len(chunks)} chunks...")
     
-    # Process each chunk
-    all_java_code = []
-    all_pseudo_code = []
+    # Create a semaphore to limit concurrent API calls (avoid rate limiting)
+    # Use environment variable or default to 2 for more conservative rate limiting
+    max_concurrent_chunks = int(os.getenv("MAX_CONCURRENT_CHUNKS", "2"))
+    semaphore = asyncio.Semaphore(max_concurrent_chunks)
+    print(f"🔒 Rate limiting: Max {max_concurrent_chunks} concurrent chunks")
     
-    for i, chunk in enumerate(chunks):
-        print(f"🔄 Processing chunk {i+1} of {len(chunks)}...")
-        
-        # Update state for current chunk
-        initial_state['current_chunk'] = i
-        initial_state['chunks'] = chunks
-        
-        # Run conversion for this chunk
-        result = await graph.ainvoke(initial_state)
-        
-        # Store chunk results
-        chunk_result = {
-            'chunk_number': i + 1,
-            'java_code': result.get('fixed_java_code', result['java_code']),
-            'pseudo_code': result['pseudo_code'],
-            'review_comments': result['review_comments']
-        }
-        initial_state['chunk_results'].append(chunk_result)
-        
-        all_java_code.append(chunk_result['java_code'])
-        all_pseudo_code.append(chunk_result['pseudo_code'])
+    # Process chunks in parallel
+    async def process_chunk(chunk_index: int, chunk: str) -> Dict[str, Any]:
+        """Process a single chunk and return its results."""
+        try:
+            async with semaphore:  # Limit concurrent execution
+                # Add a small delay to help with rate limiting
+                delay_between_chunks = float(os.getenv("DELAY_BETWEEN_CHUNKS", "0.5"))
+                if chunk_index > 0:  # Don't delay the first chunk
+                    await asyncio.sleep(delay_between_chunks)
+                
+                print(f"🔄 Processing chunk {chunk_index + 1} of {len(chunks)}...")
+                
+                # Create a new state for this chunk
+                chunk_state = ConversionState(
+                    cobol_code=chunk,  # Use the individual chunk
+                    prior_knowledge=prior_knowledge,
+                    pseudo_code="",
+                    java_code="",
+                    review_comments=[],
+                    fixed_java_code="",
+                    summary="",
+                    current_step="started",
+                    iteration_count=0,
+                    max_iterations=5,
+                    chunks=[chunk],  # Single chunk for this processing
+                    current_chunk=0,
+                    total_chunks=1,
+                    chunk_results=[]
+                )
+                
+                # Run conversion for this chunk
+                result = await graph.ainvoke(chunk_state)
+                
+                # Return chunk results
+                return {
+                    'chunk_number': chunk_index + 1,
+                    'java_code': result.get('fixed_java_code', result['java_code']),
+                    'pseudo_code': result['pseudo_code'],
+                    'review_comments': result['review_comments']
+                }
+        except Exception as e:
+            print(f"❌ Error processing chunk {chunk_index + 1}: {str(e)}")
+            raise e  # Re-raise to be handled by gather
+    
+    # Process all chunks in parallel
+    print("🚀 Starting parallel chunk processing...")
+    print(f"⚡ Processing {len(chunks)} chunks concurrently for faster conversion...")
+    chunk_tasks = [process_chunk(i, chunk) for i, chunk in enumerate(chunks)]
+    
+    # Use gather with return_exceptions=True to handle individual chunk failures
+    chunk_results = await asyncio.gather(*chunk_tasks, return_exceptions=True)
+    
+    # Filter out exceptions and handle failed chunks
+    valid_results = []
+    failed_chunks = []
+    
+    for i, result in enumerate(chunk_results):
+        if isinstance(result, Exception):
+            print(f"❌ Chunk {i+1} failed: {str(result)}")
+            failed_chunks.append(i+1)
+            # Create a placeholder result for failed chunks
+            valid_results.append({
+                'chunk_number': i + 1,
+                'java_code': f"// ERROR: Chunk {i+1} failed to process: {str(result)}",
+                'pseudo_code': f"ERROR: Chunk {i+1} failed to process",
+                'review_comments': [f"Chunk {i+1} failed: {str(result)}"]
+            })
+        else:
+            valid_results.append(result)
+    
+    if failed_chunks:
+        print(f"⚠️  {len(failed_chunks)} chunks failed: {failed_chunks}")
+    
+    # Check if we have any successful results
+    if not valid_results:
+        raise Exception("All chunks failed to process")
+    
+    chunk_results = valid_results
+    
+    # Sort results by chunk number to maintain order
+    chunk_results.sort(key=lambda x: x['chunk_number'])
+    
+    # Extract results
+    all_java_code = [result['java_code'] for result in chunk_results]
+    all_pseudo_code = [result['pseudo_code'] for result in chunk_results]
+    initial_state['chunk_results'] = chunk_results
+    
+    # Debug: Check what Java code we have from each chunk
+    print("=== CHUNK RESULTS DEBUG ===")
+    for i, chunk_result in enumerate(chunk_results):
+        java_code = chunk_result.get('java_code', '')
+        print(f"Chunk {i+1} - Java code length: {len(java_code)}")
+        print(f"Chunk {i+1} - Java code preview: {java_code[:100]}...")
+    print(f"Total Java code segments: {len(all_java_code)}")
+    print(f"Combined Java code length: {len(''.join(all_java_code))}")
+    print("=== END CHUNK RESULTS DEBUG ===")
+    
+    end_time = time.time()
+    processing_time = end_time - start_time
     
     print("✅ All chunks processed!")
+    print(f"⏱️  Total processing time: {processing_time:.2f} seconds")
+    print(f"⚡ Average time per chunk: {processing_time/len(chunks):.2f} seconds")
     
     # Combine results
     final_java_code = "\n\n// ===== CHUNK SEPARATOR =====\n\n".join(all_java_code)
     final_pseudo_code = "\n\n=== CHUNK SEPARATOR ===\n\n".join(all_pseudo_code)
     
+    # Combine review comments from all chunks
+    all_review_comments = []
+    for chunk_result in chunk_results:
+        all_review_comments.extend(chunk_result.get('review_comments', []))
+    
+    # Run the full workflow (including summarizer) for the complete conversion
+    complete_state = {
+        'cobol_code': cobol_code,
+        'prior_knowledge': prior_knowledge,
+        'chunk_results': chunk_results,
+        'total_chunks': len(chunks),
+        'iteration_count': len(chunk_results),
+        'review_comments': all_review_comments,
+        'current_step': 'ready_for_summary'
+    }
+    
+    # Create and run the summarizer
+    summarizer = FinalSummarizerAgent()
+    final_state = summarizer.summarize_conversion(complete_state)
+    final_summary = final_state.get('summary', '')
+    
+    # Debug logging
+    print(f"Generated summary length: {len(final_summary)}")
+    print(f"Summary preview: {final_summary[:200]}...")
+    
+    # Fallback if no summary was generated
+    if not final_summary:
+        final_summary = f"Conversion completed successfully. Processed {len(chunks)} chunks with {len(all_java_code)} Java code segments."
+    
+    # Debug: Check final return values
+    print("=== FINAL RETURN DEBUG ===")
+    print(f"final_java_code length: {len(final_java_code)}")
+    print(f"final_java_code preview: {final_java_code[:200]}...")
+    print(f"pseudo_code length: {len(final_pseudo_code)}")
+    print(f"summary length: {len(final_summary)}")
+    print("=== END FINAL RETURN DEBUG ===")
+    
     return {
         "original_cobol": cobol_code,
         "pseudo_code": final_pseudo_code,
         "final_java_code": final_java_code,
-        "review_comments": result["review_comments"],
-        "summary": result["summary"],
-        "iterations": result["iteration_count"],
-        "status": result["current_step"],
+        "review_comments": all_review_comments,
+        "summary": final_summary,
+        "iterations": len(chunk_results),  # Number of chunks processed
+        "status": "completed",
         "total_chunks": len(chunks),
         "chunk_results": initial_state['chunk_results']
     }

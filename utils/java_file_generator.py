@@ -158,8 +158,21 @@ public class {class_name} {{
         java_code = conversion_result.get('final_java_code', '')
         generated_files = []
         
+        print(f"=== JAVA FILE GENERATOR DEBUG ===")
+        print(f"Input Java code length: {len(java_code)}")
+        print(f"Input Java code preview: {java_code[:300]}...")
+        
+        # If no Java code, create a basic file
+        if not java_code.strip():
+            print("No Java code provided, creating basic file")
+            basic_file = self._generate_basic_java_file(conversion_result)
+            if basic_file:
+                generated_files.append(basic_file)
+            return generated_files
+        
         # Extract classes
         classes = self.extract_java_classes(java_code)
+        print(f"Extracted {len(classes)} classes")
         
         # Generate files for each class
         for class_info in classes:
@@ -176,6 +189,9 @@ public class {class_name} {{
         readme_file = self._generate_readme(conversion_result, classes)
         if readme_file:
             generated_files.append(readme_file)
+        
+        print(f"Generated {len(generated_files)} total files")
+        print(f"=== END JAVA FILE GENERATOR DEBUG ===")
         
         return generated_files
     
@@ -280,6 +296,45 @@ public class BankingSystemMain {{
             return file_path
         except Exception as e:
             print(f"❌ Error generating {file_path}: {e}")
+            return ""
+    
+    def _generate_basic_java_file(self, conversion_result: Dict[str, Any]) -> str:
+        """Generate a basic Java file when no Java code is provided."""
+        basic_code = f"""package com.banking.system;
+
+/**
+ * Basic Java file generated from COBOL conversion
+ * Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+ * 
+ * Note: No Java code was generated from the COBOL conversion.
+ * This may indicate an issue with the conversion process.
+ */
+public class BasicConversion {{
+    
+    public static void main(String[] args) {{
+        System.out.println("Basic conversion file generated");
+        System.out.println("No Java code was generated from COBOL");
+        System.out.println("Please check the conversion process");
+    }}
+    
+    /**
+     * Placeholder method for converted COBOL functionality
+     */
+    public void placeholderMethod() {{
+        // This method would contain converted COBOL code
+        System.out.println("Placeholder for converted COBOL code");
+    }}
+}}"""
+        
+        file_path = os.path.join(self.output_dir, "BasicConversion.java")
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                f.write(basic_code)
+            
+            print(f"✅ Generated basic file: {file_path}")
+            return file_path
+        except Exception as e:
+            print(f"❌ Error generating basic file {file_path}: {e}")
             return ""
     
     def _generate_readme(self, conversion_result: Dict[str, Any], classes: List[Dict[str, str]]) -> str:

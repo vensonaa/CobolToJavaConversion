@@ -34,11 +34,22 @@ export interface ConversionStatus {
 
 export const convertCobol = async (request: ConversionRequest): Promise<ConversionResponse> => {
   try {
+    console.log('Making conversion request to:', '/api/convert')
+    console.log('Request payload:', request)
+    
     const response = await api.post('/convert', request)
+    console.log('Conversion response received:', response.data)
     return response.data
   } catch (error) {
+    console.error('Conversion API error:', error)
     if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.detail || 'Conversion failed')
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        headers: error.response?.headers
+      })
+      throw new Error(error.response?.data?.detail || `Conversion failed: ${error.response?.status} ${error.response?.statusText}`)
     }
     throw error
   }
@@ -46,11 +57,21 @@ export const convertCobol = async (request: ConversionRequest): Promise<Conversi
 
 export const getConversionStatus = async (conversionId: string): Promise<ConversionStatus> => {
   try {
+    console.log('Making status request to:', `/api/status/${conversionId}`)
+    
     const response = await api.get(`/status/${conversionId}`)
+    console.log('Status response received:', response.data)
     return response.data
   } catch (error) {
+    console.error('Status API error:', error)
     if (axios.isAxiosError(error)) {
-      throw new Error(error.response?.data?.detail || 'Failed to get status')
+      console.error('Axios error details:', {
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data,
+        headers: error.response?.headers
+      })
+      throw new Error(error.response?.data?.detail || `Failed to get status: ${error.response?.status} ${error.response?.statusText}`)
     }
     throw error
   }
